@@ -1,36 +1,51 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Air
+
+Airbnb co-host property & calendar management platform.
+
+**Live:** https://air.lightepic.com
+
+## Features
+
+- **Calendar View** — Monthly and timeline views with drag interactions
+- **iCal Sync** — Import bookings from Airbnb, Booking.com via iCal feeds
+- **Multi-tenant Auth** — Each co-host sees only their own properties and data
+- **Inventory Tracking** — Stock per property, auto-deduct on checkout, low stock alerts
+- **Maintenance Tasks** — Track repairs and equipment issues per property
+- **Today Panel** — Check-ins, check-outs, and cleaning schedule at a glance
+
+## Tech Stack
+
+- Next.js 16 (App Router)
+- PostgreSQL + Prisma ORM
+- JWT auth with `jose`
+- Tailwind CSS + shadcn/ui
+- Deployed on Oracle Cloud ARM with PM2
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+# Install
+npm install
+
+# Set up environment
+cp .env.example .env
+# Edit .env with your DATABASE_URL
+
+# Generate Prisma client & run migrations
+npx prisma generate
+npx prisma migrate dev
+
+# Seed demo data
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+curl -X POST http://localhost:3000/api/seed
+
+# Login with demo@air.local / demo123
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Deploy
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+bash oracle/scripts/deploy.sh
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See [oracle/README.md](oracle/README.md) for full deployment documentation.
