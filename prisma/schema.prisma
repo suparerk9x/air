@@ -1,0 +1,208 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Multi-tenant: each user (co-host) has their own properties
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  password  String
+  role      Role     @default(COHOST)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  properties Property[]
+
+  @@map("users")
+}
+
+enum Role {
+  ADMIN
+  COHOST
+}
+
+model Property {
+  id          String   @id @default(cuid())
+  name        String
+  address     String?
+  icalUrl     String?  // iCal feed URL from Airbnb/Booking.com
+  color       String   @default("#3b82f6") // for calendar display
+  platform    String?  // airbnb, booking, etc
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  bookings          Booking[]
+  housekeepingTasks HousekeepingTask[]
+  propertyStocks    PropertyStock[]
+
+  @@map("properties")
+}
+
+model Booking {
+  id          String      @id @default(cuid())
+  summary     String?     // guest name from iCal
+  startDate   DateTime
+  endDate     DateTime
+  status      BookingStatus @default(CONFIRMED)
+  source      String?     // ical, manual
+  externalUid String?     // UID from iCal to avoid duplicates
+  notes       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  housekeepingTask HousekeepingTask?
+
+  @@unique([propertyId, externalUid])
+  @@map("bookings")
+}
+
+enum BookingStatus {
+  CONFIRMED
+  CHECKEDIN
+  CHECKEDOUT
+  CANCELLED
+  BLOCKED
+}
+
+model HousekeepingTask {
+  id          String              @id @default(cuid())
+  date        DateTime            // scheduled cleaning date (= checkout date)
+  status      HousekeepingStatus  @default(PENDING)
+  assignee    String?
+  notes       String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  bookingId  String?  @unique
+  booking    Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  @@map("housekeeping_tasks")
+}
+
+enum HousekeepingStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+// ─── Inventory ────────────────────────────────────────────────────────
+
+// Master catalog of items (central)
+model InventoryItem {
+  id           String            @id @default(cuid())
+  name         String
+  category     InventoryCategory
+  unit         String            @default("pcs") // pcs, set, bottle, roll, etc.
+  description  String?
+  imageUrl     String?           // product image
+  minStock     Int               @default(5)     // low stock alert threshold
+  usagePerCheckout Int           @default(0)     // auto-deduct qty per checkout (0 = manual only)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  propertyStocks PropertyStock[]
+  stockLogs      StockLog[]
+
+  @@map("inventory_items")
+}
+
+enum InventoryCategory {
+  LINEN        // ผ้าปูที่นอน ผ้าเช็ดตัว ผ้าห่ม หมอน
+  AMENITY      // สบู่ แชมพู แปรงสีฟัน กาแฟ น้ำดื่ม
+  EQUIPMENT    // รีโมท กุญแจ adapter ไดร์เป่าผม หม้อต้มน้ำ
+  CONSUMABLE   // น้ำยาทำความสะอาด ถุงขยะ กระดาษทิชชู่
+  MAINTENANCE  // หลอดไฟ แอร์ filter ประปา อะไหล่
+}
+
+// Stock per property (how many of each item is at each property)
+model PropertyStock {
+  id          String   @id @default(cuid())
+  quantity    Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  propertyId  String
+  property    Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  itemId      String
+  item        InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([propertyId, itemId])
+  @@map("property_stocks")
+}
+
+// Log every stock movement: restock, usage, adjustment, transfer
+model StockLog {
+  id          String       @id @default(cuid())
+  type        StockLogType
+  quantity    Int          // positive = in, negative = out
+  note        String?
+  cost        Float?       // purchase cost (for restock)
+  createdAt   DateTime     @default(now())
+
+  itemId      String
+  item        InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  propertyId  String?      // null = central warehouse
+  bookingId   String?      // link to booking for auto-deduct
+
+  @@map("stock_logs")
+}
+
+enum StockLogType {
+  RESTOCK      // ซื้อเข้า / เติม stock
+  CHECKOUT_USE // auto-deduct เมื่อ checkout
+  MANUAL_USE   // ใช้ manual (เสีย/หาย)
+  ADJUSTMENT   // ปรับ stock ตาม actual count
+  TRANSFER     // โอนระหว่าง property
+}
+
+// Maintenance tasks for equipment
+model MaintenanceTask {
+  id          String              @id @default(cuid())
+  title       String
+  description String?
+  status      MaintenanceStatus   @default(OPEN)
+  priority    MaintenancePriority @default(MEDIUM)
+  dueDate     DateTime?
+  completedAt DateTime?
+  cost        Float?
+  assignee    String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  propertyId  String
+  itemId      String?             // link to inventory item if applicable
+
+  @@map("maintenance_tasks")
+}
+
+enum MaintenanceStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum MaintenancePriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
