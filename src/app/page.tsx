@@ -135,7 +135,6 @@ export default function Dashboard() {
 
   const handleSyncAll = async () => {
     const propsWithIcal = properties.filter((p) => p.icalUrl);
-    if (propsWithIcal.length === 0) return;
     for (const prop of propsWithIcal) {
       await handleSync(prop.id);
     }
