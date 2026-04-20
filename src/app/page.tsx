@@ -34,7 +34,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { isSameDay, addDays } from "date-fns";
+import { isSameDay, addDays, format } from "date-fns";
 
 interface Property {
   id: string;
@@ -85,6 +85,7 @@ export default function Dashboard() {
   const [viewMode, setViewMode] = useState<"monthly" | "timeline">("monthly");
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<UserInfo | null>(null);
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
 
   const fetchProperties = useCallback(async () => {
     try {
@@ -133,9 +134,12 @@ export default function Dashboard() {
   };
 
   const handleSyncAll = async () => {
-    for (const prop of properties.filter((p) => p.icalUrl)) {
+    const propsWithIcal = properties.filter((p) => p.icalUrl);
+    if (propsWithIcal.length === 0) return;
+    for (const prop of propsWithIcal) {
       await handleSync(prop.id);
     }
+    setLastSyncTime(new Date());
   };
 
   const handleSaveProperty = async (data: {
@@ -340,14 +344,19 @@ export default function Dashboard() {
             <Button
               variant="outline"
               size="sm"
-              className="hidden md:flex"
+              className="hidden md:flex items-center"
               onClick={handleSyncAll}
               disabled={syncing !== null}
             >
               <RefreshCw
                 className={`h-3.5 w-3.5 mr-1.5 ${syncing ? "animate-spin" : ""}`}
               />
-              Sync
+              {syncing ? "Syncing..." : "Sync"}
+              {lastSyncTime && !syncing && (
+                <span className="ml-1.5 text-[10px] text-gray-400 font-normal">
+                  {format(lastSyncTime, "HH:mm")}
+                </span>
+              )}
             </Button>
 
             <Button
