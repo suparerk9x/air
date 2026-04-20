@@ -33,7 +33,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { isSameDay, addDays } from "date-fns";
 
@@ -425,7 +424,7 @@ export default function Dashboard() {
                 </span>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64">
-                <DropdownMenuLabel className="px-3 py-3 font-normal">
+                <div className="px-3 py-3">
                   <div className="flex items-center gap-3">
                     <div className="h-9 w-9 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-sm shrink-0">
                       <span className="text-sm font-bold text-white">
@@ -445,7 +444,7 @@ export default function Dashboard() {
                       )}
                     </div>
                   </div>
-                </DropdownMenuLabel>
+                </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="gap-2 cursor-pointer">
                   <Settings className="h-4 w-4 text-gray-400" />
