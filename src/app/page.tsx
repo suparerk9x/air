@@ -22,6 +22,9 @@ import {
   GanttChart,
   Info,
   Package,
+  Settings,
+  LogOut,
+  Shield,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -29,6 +32,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { isSameDay, addDays } from "date-fns";
 
@@ -414,21 +419,53 @@ export default function Dashboard() {
 
             {/* User avatar */}
             <DropdownMenu>
-              <DropdownMenuTrigger className="h-8 w-8 inline-flex items-center justify-center rounded-full bg-gradient-to-br from-gray-200 to-gray-300 hover:from-gray-300 hover:to-gray-400">
-                <User className="h-4 w-4 text-gray-600" />
+              <DropdownMenuTrigger className="h-8 w-8 inline-flex items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 shadow-sm ring-2 ring-white transition-all hover:scale-105">
+                <span className="text-xs font-bold text-white leading-none">
+                  {user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || "U"}
+                </span>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <div className="px-3 py-2 border-b">
-                  <div className="text-sm font-medium">{user?.name || "User"}</div>
-                  <div className="text-xs text-gray-400">{user?.email}</div>
+              <DropdownMenuContent align="end" className="w-64 p-0 overflow-hidden">
+                {/* Profile header */}
+                <div className="bg-gradient-to-br from-violet-500/10 via-indigo-500/5 to-transparent px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-md">
+                      <span className="text-sm font-bold text-white">
+                        {user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || "U"}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-gray-900 truncate">
+                        {user?.name || "User"}
+                      </div>
+                      <div className="text-xs text-gray-500 truncate">{user?.email}</div>
+                    </div>
+                  </div>
+                  {user?.role && (
+                    <div className="mt-2 flex items-center gap-1">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700">
+                        <Shield className="h-2.5 w-2.5" />
+                        {user.role === "ADMIN" ? "Admin" : "Co-host"}
+                      </span>
+                    </div>
+                  )}
                 </div>
-                <DropdownMenuItem>Settings</DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-red-600"
-                  onClick={() => logout()}
-                >
-                  Log out
-                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <div className="p-1">
+                  <DropdownMenuItem className="flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer">
+                    <Settings className="h-4 w-4 text-gray-400" />
+                    <span>Settings</span>
+                  </DropdownMenuItem>
+                </div>
+                <DropdownMenuSeparator />
+                <div className="p-1">
+                  <DropdownMenuItem
+                    className="flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer text-red-600 focus:text-red-700 focus:bg-red-50"
+                    onClick={() => logout()}
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span>Log out</span>
+                  </DropdownMenuItem>
+                </div>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
