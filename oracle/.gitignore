@@ -1,0 +1,28 @@
+# SSH Keys - NEVER commit these!
+.ssh/
+*.key
+*.pem
+*.ppk
+
+# Backups
+backups/
+*.tar.gz
+*.zip
+*.sql
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+*.tmp

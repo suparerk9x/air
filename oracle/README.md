@@ -7,38 +7,63 @@ Deployment configuration for **Air** (Airbnb Co-host Property & Calendar Managem
 | Key | Value |
 |-----|-------|
 | URL | https://air.lightepic.com |
-| Server | 161.33.204.39 (Oracle Cloud ARM) |
+| Server | `161.33.204.39` (Oracle Cloud ARM) |
 | PM2 Name | `air` |
 | Port | 3200 |
 | Database | PostgreSQL `air` on `docker-db_postgres-1` |
 | Repo | https://github.com/suparerk9x/air |
 | Path on server | `/home/ubuntu/apps/air` |
 
+## File Structure
+
+```
+oracle/
+├── .gitignore              # Prevents keys/backups from being committed
+├── .ssh/
+│   └── oracle-arm.key      # SSH private key (git-ignored)
+├── scripts/
+│   ├── connect.sh           # SSH into the server
+│   ├── deploy.sh            # Build & deploy to production
+│   ├── backup.sh            # Backup database locally
+│   └── monitor.sh           # Check server/app status
+├── backups/                 # Local DB backups (git-ignored)
+└── README.md                # This file
+```
+
+## Scripts
+
+All scripts run from **project root** (`d:\Antigravity\Air`):
+
+| Script | Usage | Description |
+|--------|-------|-------------|
+| `connect.sh` | `bash oracle/scripts/connect.sh` | SSH into the server |
+| `deploy.sh` | `bash oracle/scripts/deploy.sh` | Push to GitHub, pull on server, build, reload PM2 |
+| `backup.sh` | `bash oracle/scripts/backup.sh` | Dump `air` database and download to `oracle/backups/` |
+| `monitor.sh` | `bash oracle/scripts/monitor.sh` | Show app status, resources, DB size, health check |
+
 ## SSH Connection
 
 ```bash
-ssh -i <path-to>/oracle-arm.key ubuntu@161.33.204.39
+# Using the script
+bash oracle/scripts/connect.sh
+
+# Or manually
+ssh -i oracle/.ssh/oracle-arm.key ubuntu@161.33.204.39
 ```
 
-SSH key locations (any of these work):
-- `d:\Antigravity\Agentic-Enterprise\.ssh\oracle-arm.key`
-- `d:\Antigravity\Lumitra\oracle\.ssh\oracle-arm.key`
-- `d:\Antigravity\Super Richy\.ssh\oracle-arm.key`
+The SSH key is at `oracle/.ssh/oracle-arm.key` (git-ignored, never committed).
 
 ## Deploy
 
 ```bash
-SSH_KEY="<path-to>/oracle-arm.key"
-ssh -i "$SSH_KEY" ubuntu@161.33.204.39 << 'DEPLOY'
-cd /home/ubuntu/apps/air
-git pull
-npm install
-npx prisma generate
-npx prisma migrate deploy
-npm run build
-pm2 reload air
-pm2 save
-DEPLOY
+# One command
+bash oracle/scripts/deploy.sh
+
+# What it does:
+# 1. git push origin master
+# 2. SSH to server
+# 3. git pull → npm install → prisma generate → prisma migrate → npm run build
+# 4. pm2 reload air
 ```
 
 ## Environment (.env on server)
@@ -50,6 +75,8 @@ PORT=3200
 SESSION_SECRET="<secret>"
 ```
 
+Located at `/home/ubuntu/apps/air/.env` on the server.
+
 ## Architecture
 
 - **Framework:** Next.js 16 (App Router)
@@ -57,7 +84,7 @@ SESSION_SECRET="<secret>"
 - **ORM:** Prisma (PostgreSQL)
 - **Proxy:** Nginx Proxy Manager → `172.17.0.1:3200`
 - **SSL:** Wildcard `*.lightepic.com` certificate (Cloudflare)
-- **Firewall:** iptables rule for port 3200 required
+- **Firewall:** iptables rule for port 3200
 
 ## Nginx Proxy Manager
 
@@ -80,23 +107,22 @@ Managed at https://nginx.lightepic.com
 PostgreSQL running in Docker container `docker-db_postgres-1`:
 
 ```bash
-# Connect to database
-ssh -i "$SSH_KEY" ubuntu@161.33.204.39
-docker exec -it docker-db_postgres-1 psql -U postgres -d air
+# Backup (using script)
+bash oracle/scripts/backup.sh
 
-# Backup
-docker exec docker-db_postgres-1 pg_dump -U postgres air > air-backup-$(date +%Y%m%d).sql
+# Connect directly
+ssh -i oracle/.ssh/oracle-arm.key ubuntu@161.33.204.39
+docker exec -it docker-db_postgres-1 psql -U postgres -d air
 ```
 
-## PM2 Commands
+## PM2 Commands (on server)
 
 ```bash
-pm2 list | grep air       # Status
-pm2 logs air --lines 50   # Logs
-pm2 reload air             # Zero-downtime reload
-pm2 restart air            # Hard restart
-pm2 stop air               # Stop
-pm2 delete air             # Remove
+pm2 list | grep air        # Status
+pm2 logs air --lines 50    # Logs
+pm2 reload air              # Zero-downtime reload
+pm2 restart air             # Hard restart
+pm2 stop air                # Stop
 ```
 
 ## Seed Demo Data
@@ -110,27 +136,24 @@ curl -X POST https://air.lightepic.com/api/seed
 
 **502 Bad Gateway:**
 ```bash
-# Check if app is running
+# 1. Check if app is running
 pm2 list | grep air
 
-# Check if port is open from NPM container
+# 2. Check if port is reachable from Nginx container
 docker exec nginx-proxy-manager python3 -c "
 import urllib.request
 r = urllib.request.urlopen('http://172.17.0.1:3200/', timeout=3)
 print('Status:', r.status)
 "
 
-# If not reachable, add iptables rule
+# 3. If not reachable, add iptables rule
 sudo iptables -I INPUT -p tcp --dport 3200 -j ACCEPT
 sudo iptables-save | sudo tee /etc/iptables/rules.v4 > /dev/null
 ```
 
 **Database connection error:**
 ```bash
-# Check PostgreSQL container is running
 docker ps | grep postgres
-
-# Test connection
 docker exec docker-db_postgres-1 psql -U postgres -c "SELECT 1" air
 ```
 
