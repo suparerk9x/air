@@ -74,6 +74,19 @@ bash oracle/scripts/deploy.sh
 
 See `oracle/README.md` for full deployment docs.
 
+## Devatar Framework
+
+This project uses **Devatar Activation Level 2** (Early Product + Architecture Risk Override for multi-tenant).
+
+Before implementing ANY feature:
+1. Read `knowledge/feature-map.md` — does this feature already exist?
+2. Read `knowledge/database-schema.md` — what tables are involved?
+3. Read `.claude/rules/architecture-rules.md` — follow tenant isolation patterns
+4. Read the relevant `knowledge/modules/<name>.md`
+5. After implementation: update feature-map and module knowledge
+
+See `knowledge/devatar-activation-report.md` for full activation details.
+
 ## Important Notes
 
 - base-ui components: `DropdownMenuLabel` MUST be inside `DropdownMenuGroup`, otherwise throws error #31
