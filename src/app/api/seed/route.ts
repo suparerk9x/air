@@ -1,16 +1,19 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import bcrypt from "bcryptjs";
 
 // POST /api/seed - create demo data for development
 export async function POST() {
+  const hashedPassword = await bcrypt.hash("demo123", 10);
+
   // Create demo user
   const user = await prisma.user.upsert({
     where: { email: "demo@air.local" },
-    update: {},
+    update: { password: hashedPassword },
     create: {
       email: "demo@air.local",
       name: "Demo Host",
-      password: "demo", // TODO: hash in production
+      password: hashedPassword,
       role: "COHOST",
     },
   });
@@ -58,7 +61,6 @@ export async function POST() {
   // Create sample bookings
   const now = new Date();
   const bookings = [
-    // Past booking
     {
       summary: "John Smith",
       startDate: new Date(now.getFullYear(), now.getMonth(), now.getDate() - 5),
@@ -67,7 +69,6 @@ export async function POST() {
       source: "ical",
       propertyId: prop1.id,
     },
-    // Current booking
     {
       summary: "Maria Garcia",
       startDate: new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1),
@@ -76,7 +77,6 @@ export async function POST() {
       source: "ical",
       propertyId: prop1.id,
     },
-    // Future booking
     {
       summary: "Tanaka Yuki",
       startDate: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 5),
@@ -85,7 +85,6 @@ export async function POST() {
       source: "ical",
       propertyId: prop1.id,
     },
-    // Silom bookings
     {
       summary: "David Lee",
       startDate: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
@@ -102,7 +101,6 @@ export async function POST() {
       source: "ical",
       propertyId: prop2.id,
     },
-    // Hua Hin bookings
     {
       summary: "Blocked",
       startDate: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1),
@@ -121,7 +119,6 @@ export async function POST() {
     },
   ];
 
-  // Clear existing bookings for demo properties
   await prisma.booking.deleteMany({
     where: {
       propertyId: { in: [prop1.id, prop2.id, prop3.id] },
@@ -137,5 +134,6 @@ export async function POST() {
     user: user.id,
     properties: [prop1.id, prop2.id, prop3.id],
     bookings: bookings.length,
+    credentials: { email: "demo@air.local", password: "demo123" },
   });
 }

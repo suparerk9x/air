@@ -1,27 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { fetchICalEvents } from "@/lib/ical";
+import {
+  getAuthUserId,
+  verifyPropertyOwnership,
+  unauthorizedResponse,
+  forbiddenResponse,
+} from "@/lib/auth-api";
 
 // POST /api/properties/:id/sync - sync iCal bookings
 export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-  const property = await prisma.property.findUnique({ where: { id } });
-
-  if (!property) {
-    return NextResponse.json({ error: "Property not found" }, { status: 404 });
-  }
-
-  if (!property.icalUrl) {
-    return NextResponse.json(
-      { error: "No iCal URL configured" },
-      { status: 400 }
-    );
-  }
-
   try {
+    const userId = await getAuthUserId();
+    const { id } = await params;
+
+    if (!(await verifyPropertyOwnership(id, userId))) {
+      return forbiddenResponse();
+    }
+
+    const property = await prisma.property.findUnique({ where: { id } });
+
+    if (!property) {
+      return NextResponse.json(
+        { error: "Property not found" },
+        { status: 404 }
+      );
+    }
+
+    if (!property.icalUrl) {
+      return NextResponse.json(
+        { error: "No iCal URL configured" },
+        { status: 400 }
+      );
+    }
+
     const events = await fetchICalEvents(property.icalUrl);
     let created = 0;
     let updated = 0;
@@ -70,6 +85,9 @@ export async function POST(
       updated,
     });
   } catch (error) {
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return unauthorizedResponse();
+    }
     console.error("iCal sync error:", error);
     return NextResponse.json(
       { error: "Failed to fetch iCal feed" },

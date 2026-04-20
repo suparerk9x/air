@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { logout } from "@/app/actions/auth";
 import { CalendarGrid } from "@/components/calendar/calendar-grid";
 import { TimelineView } from "@/components/calendar/timeline-view";
 import { PropertySidebar } from "@/components/calendar/property-sidebar";
@@ -59,6 +60,13 @@ interface Booking extends RawBooking {
   };
 }
 
+interface UserInfo {
+  id: string;
+  name: string | null;
+  email: string;
+  role: string;
+}
+
 export default function Dashboard() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -72,6 +80,7 @@ export default function Dashboard() {
   const [showBookingDetail, setShowBookingDetail] = useState(false);
   const [viewMode, setViewMode] = useState<"monthly" | "timeline">("monthly");
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<UserInfo | null>(null);
 
   const fetchProperties = useCallback(async () => {
     try {
@@ -90,6 +99,10 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchProperties();
+    fetch("/api/auth/me")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => setUser(data))
+      .catch(() => {});
   }, [fetchProperties]);
 
   const handleToggleProperty = (id: string) => {
@@ -138,7 +151,7 @@ export default function Dashboard() {
       await fetch("/api/properties", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, userId: "demo-user" }),
+        body: JSON.stringify(data),
       });
     }
     setShowPropertyDialog(false);
@@ -406,11 +419,14 @@ export default function Dashboard() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <div className="px-3 py-2 border-b">
-                  <div className="text-sm font-medium">Demo Host</div>
-                  <div className="text-xs text-gray-400">demo@air.local</div>
+                  <div className="text-sm font-medium">{user?.name || "User"}</div>
+                  <div className="text-xs text-gray-400">{user?.email}</div>
                 </div>
                 <DropdownMenuItem>Settings</DropdownMenuItem>
-                <DropdownMenuItem className="text-red-600">
+                <DropdownMenuItem
+                  className="text-red-600"
+                  onClick={() => logout()}
+                >
                   Log out
                 </DropdownMenuItem>
               </DropdownMenuContent>

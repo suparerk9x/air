@@ -1,44 +1,53 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getAuthUserId, unauthorizedResponse } from "@/lib/auth-api";
 
-// GET /api/properties - list all properties with bookings
+// GET /api/properties - list authenticated user's properties with bookings
 export async function GET() {
-  // TODO: filter by authenticated user
-  const properties = await prisma.property.findMany({
-    include: {
-      bookings: {
-        orderBy: { startDate: "asc" },
-      },
-    },
-    orderBy: { name: "asc" },
-  });
+  try {
+    const userId = await getAuthUserId();
 
-  return NextResponse.json(properties);
+    const properties = await prisma.property.findMany({
+      where: { userId },
+      include: {
+        bookings: {
+          orderBy: { startDate: "asc" },
+        },
+      },
+      orderBy: { name: "asc" },
+    });
+
+    return NextResponse.json(properties);
+  } catch {
+    return unauthorizedResponse();
+  }
 }
 
-// POST /api/properties - create a new property
+// POST /api/properties - create a new property for authenticated user
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const { name, address, icalUrl, color, platform, notes, userId } = body;
+  try {
+    const userId = await getAuthUserId();
+    const body = await req.json();
+    const { name, address, icalUrl, color, platform, notes } = body;
 
-  if (!name || !userId) {
-    return NextResponse.json(
-      { error: "name and userId are required" },
-      { status: 400 }
-    );
+    if (!name) {
+      return NextResponse.json({ error: "name is required" }, { status: 400 });
+    }
+
+    const property = await prisma.property.create({
+      data: {
+        name,
+        address,
+        icalUrl,
+        color: color || "#3b82f6",
+        platform,
+        notes,
+        userId,
+      },
+    });
+
+    return NextResponse.json(property, { status: 201 });
+  } catch {
+    return unauthorizedResponse();
   }
-
-  const property = await prisma.property.create({
-    data: {
-      name,
-      address,
-      icalUrl,
-      color: color || "#3b82f6",
-      platform,
-      notes,
-      userId,
-    },
-  });
-
-  return NextResponse.json(property, { status: 201 });
 }
