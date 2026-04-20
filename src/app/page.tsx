@@ -424,11 +424,10 @@ export default function Dashboard() {
                   {user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || "U"}
                 </span>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64 p-0 overflow-hidden">
-                {/* Profile header */}
-                <div className="bg-gradient-to-br from-violet-500/10 via-indigo-500/5 to-transparent px-4 py-3">
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel className="px-3 py-3 font-normal">
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-md">
+                    <div className="h-9 w-9 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-sm shrink-0">
                       <span className="text-sm font-bold text-white">
                         {user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || "U"}
                       </span>
@@ -438,34 +437,28 @@ export default function Dashboard() {
                         {user?.name || "User"}
                       </div>
                       <div className="text-xs text-gray-500 truncate">{user?.email}</div>
+                      {user?.role && (
+                        <span className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-indigo-50 text-indigo-600">
+                          <Shield className="h-2.5 w-2.5" />
+                          {user.role === "ADMIN" ? "Admin" : "Co-host"}
+                        </span>
+                      )}
                     </div>
                   </div>
-                  {user?.role && (
-                    <div className="mt-2 flex items-center gap-1">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700">
-                        <Shield className="h-2.5 w-2.5" />
-                        {user.role === "ADMIN" ? "Admin" : "Co-host"}
-                      </span>
-                    </div>
-                  )}
-                </div>
+                </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <div className="p-1">
-                  <DropdownMenuItem className="flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer">
-                    <Settings className="h-4 w-4 text-gray-400" />
-                    <span>Settings</span>
-                  </DropdownMenuItem>
-                </div>
+                <DropdownMenuItem className="gap-2 cursor-pointer">
+                  <Settings className="h-4 w-4 text-gray-400" />
+                  Settings
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <div className="p-1">
-                  <DropdownMenuItem
-                    className="flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer text-red-600 focus:text-red-700 focus:bg-red-50"
-                    onClick={() => logout()}
-                  >
-                    <LogOut className="h-4 w-4" />
-                    <span>Log out</span>
-                  </DropdownMenuItem>
-                </div>
+                <DropdownMenuItem
+                  className="gap-2 cursor-pointer text-red-600"
+                  onClick={() => logout()}
+                >
+                  <LogOut className="h-4 w-4" />
+                  Log out
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
