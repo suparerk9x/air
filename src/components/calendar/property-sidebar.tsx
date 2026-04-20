@@ -93,36 +93,16 @@ export function PropertySidebar({
   }
 
   return (
-    <div className="w-64 bg-white rounded-xl shadow-sm border h-fit shrink-0">
+    <div className="bg-white rounded-lg border h-fit">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b">
+      <div className="px-3 py-2 border-b">
         <h3 className="font-semibold text-xs uppercase tracking-wider text-gray-400">
-          Properties
+          Listings
         </h3>
-        <div className="flex items-center gap-0.5">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6"
-            onClick={onAdd}
-            title="Add property"
-          >
-            <Plus className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6"
-            onClick={() => setCollapsed(true)}
-            title="Collapse sidebar"
-          >
-            <PanelLeftClose className="h-3.5 w-3.5" />
-          </Button>
-        </div>
       </div>
 
       {/* Property list */}
-      <div className="p-2 space-y-0.5">
+      <div className="p-1.5 space-y-0">
         {properties.map((prop) => {
           const platform = prop.platform || "other";
           const platformColor =
@@ -131,7 +111,7 @@ export function PropertySidebar({
           return (
             <div
               key={prop.id}
-              className="flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-gray-50 group transition-colors"
+              className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 group transition-colors"
             >
               <button
                 onClick={() => onToggle(prop.id)}
@@ -153,17 +133,6 @@ export function PropertySidebar({
                 </div>
               </button>
 
-              {prop.platform && (
-                <span
-                  className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0"
-                  style={{
-                    backgroundColor: platformColor.bg,
-                    color: platformColor.text,
-                  }}
-                >
-                  {prop.platform}
-                </span>
-              )}
 
               <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                 {prop.icalUrl && (
@@ -206,10 +175,10 @@ export function PropertySidebar({
 
         {properties.length === 0 && (
           <div className="text-center py-6 px-4">
-            <p className="text-sm text-gray-400 mb-2">No properties yet</p>
+            <p className="text-sm text-gray-400 mb-2">No listings yet</p>
             <Button size="sm" variant="outline" onClick={onAdd}>
               <Plus className="h-3 w-3 mr-1" />
-              Add Property
+              Add Listing
             </Button>
           </div>
         )}

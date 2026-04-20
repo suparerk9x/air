@@ -13,13 +13,18 @@ export async function GET() {
         bookings: {
           orderBy: { startDate: "asc" },
         },
+        icalFeeds: { select: { id: true } },
       },
       orderBy: { name: "asc" },
     });
 
     return NextResponse.json(properties);
-  } catch {
-    return unauthorizedResponse();
+  } catch (error) {
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return unauthorizedResponse();
+    }
+    console.error("GET /api/properties error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 

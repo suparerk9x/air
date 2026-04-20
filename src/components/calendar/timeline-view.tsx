@@ -8,7 +8,7 @@ import {
   isToday,
   startOfDay,
 } from "date-fns";
-import { User, AlertTriangle } from "lucide-react";
+import { User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getContrastTextColor } from "@/lib/color";
 
@@ -36,7 +36,6 @@ interface TimelineViewProps {
   properties: Property[];
   currentDate: Date;
   onBookingClick?: (booking: Booking & { property: { name: string; color: string } }) => void;
-  onDateClick?: (date: Date) => void;
   selectedPropertyIds: string[];
 }
 
@@ -68,37 +67,14 @@ export function TimelineView({
     selectedPropertyIds.includes(p.id)
   );
 
-  // Detect same-day turnovers (checkout + checkin on same day for same property)
-  const turnovers = useMemo(() => {
-    const set = new Set<string>(); // "propertyId:yyyy-MM-dd"
-    for (const prop of filteredProperties) {
-      const checkouts = new Map<string, string>(); // dateKey -> bookingId
-      const checkins = new Map<string, string>();
-
-      for (const b of prop.bookings) {
-        if (b.status === "CANCELLED") continue;
-        const endKey = format(new Date(b.endDate), "yyyy-MM-dd");
-        const startKey = format(new Date(b.startDate), "yyyy-MM-dd");
-        checkouts.set(endKey, b.id);
-        checkins.set(startKey, b.id);
-      }
-
-      for (const [dateKey] of checkouts) {
-        if (checkins.has(dateKey)) {
-          set.add(`${prop.id}:${dateKey}`);
-        }
-      }
-    }
-    return set;
-  }, [filteredProperties]);
-
   // Scroll to today on mount
   useEffect(() => {
     if (todayRef.current && scrollRef.current) {
       const todayOffset = todayRef.current.offsetLeft - DAY_WIDTH * 2;
       scrollRef.current.scrollLeft = Math.max(0, todayOffset);
     }
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dates]);
 
   const timelineWidth = TOTAL_DAYS * DAY_WIDTH;
 
@@ -155,7 +131,7 @@ export function TimelineView({
                     ref={isT ? todayRef : undefined}
                     className={cn(
                       "flex flex-col items-center justify-end pb-1 border-r shrink-0",
-                      isT && "bg-blue-50",
+                      isT && "bg-emerald-50",
                       isWeekend && !isT && "bg-gray-50/60",
                       isMonthStart && "border-l-2 border-l-gray-300",
                       isMonday && !isMonthStart && "border-l border-l-gray-200"
@@ -176,7 +152,7 @@ export function TimelineView({
                     <span
                       className={cn(
                         "text-[13px] font-semibold w-7 h-7 flex items-center justify-center rounded-full leading-none",
-                        isT && "bg-blue-600 text-white",
+                        isT && "bg-emerald-600 text-white",
                         !isT && isWeekend && "text-red-500",
                         !isT && !isWeekend && "text-gray-700"
                       )}
@@ -197,7 +173,6 @@ export function TimelineView({
                   const isMonday = date.getDay() === 1;
                   const isMonthStart = date.getDate() === 1;
                   const dayKey = format(date, "yyyy-MM-dd");
-                  const isTurnover = turnovers.has(`${prop.id}:${dayKey}`);
                   const isCleaning = prop.bookings.some((b) => {
                     if (b.status === "BLOCKED" || b.status === "CANCELLED") return false;
                     return format(new Date(b.endDate), "yyyy-MM-dd") === dayKey;
@@ -208,24 +183,20 @@ export function TimelineView({
                       key={di}
                       className={cn(
                         "border-b border-r shrink-0 relative group/cell",
-                        isT && "bg-blue-50/40",
+                        isT && "bg-emerald-50",
                         isWeekend && !isT && "bg-gray-50/40",
                         isMonthStart && "border-l-2 border-l-gray-300",
                         isMonday && !isMonthStart && "border-l border-l-gray-200"
                       )}
                       style={{ width: DAY_WIDTH, height: ROW_HEIGHT }}
                     >
-                      {/* Cleaning / turnover icon — centered, above bars */}
-                      {(isCleaning || isTurnover) && (
+                      {/* Cleaning icon — centered, above bars */}
+                      {isCleaning && (
                         <div
                           className="absolute z-[15] flex items-center justify-center w-[18px] h-[18px] rounded-full shadow-sm left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-amber-400"
-                          title={isTurnover ? "Same-day turnover!" : "Cleaning needed"}
+                          title="Cleaning needed"
                         >
-                          {isTurnover ? (
-                            <AlertTriangle className="h-2.5 w-2.5 text-gray-900" />
-                          ) : (
-                            <User className="h-2.5 w-2.5 text-gray-900" />
-                          )}
+                          <User className="h-2.5 w-2.5 text-gray-900" />
                         </div>
                       )}
                     </div>
@@ -331,19 +302,6 @@ export function TimelineView({
               </div>
             ))}
 
-            {/* Today line */}
-            {(() => {
-              const todayIdx = dates.findIndex((d) => isToday(d));
-              if (todayIdx === -1) return null;
-              return (
-                <div
-                  className="absolute top-0 bottom-0 w-[2px] bg-blue-500/70 z-[8] pointer-events-none"
-                  style={{ left: todayIdx * DAY_WIDTH + DAY_WIDTH / 2 }}
-                >
-                  <div className="w-2.5 h-2.5 bg-blue-500 rounded-full -ml-[3px] -mt-0.5" />
-                </div>
-              );
-            })()}
           </div>
         </div>
       </div>

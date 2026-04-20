@@ -6,27 +6,19 @@ import { CalendarGrid } from "@/components/calendar/calendar-grid";
 import { TimelineView } from "@/components/calendar/timeline-view";
 import { PropertySidebar } from "@/components/calendar/property-sidebar";
 import { PropertyDialog } from "@/components/calendar/property-dialog";
-import { BookingDialog } from "@/components/calendar/booking-dialog";
 import { BookingDetailDialog } from "@/components/calendar/booking-detail-dialog";
 import { TodayPanel } from "@/components/calendar/today-panel";
-import { StatsBar } from "@/components/calendar/stats-bar";
+import { AppSidebar } from "@/components/app-sidebar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
-  Plus,
   RefreshCw,
   Bell,
-  User,
-  Plane,
   CalendarDays,
   GanttChart,
-  Info,
-  Package,
-  Settings,
   LogOut,
   Shield,
 } from "lucide-react";
-import Link from "next/link";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -78,8 +70,6 @@ export default function Dashboard() {
   const [syncing, setSyncing] = useState<string | null>(null);
   const [showPropertyDialog, setShowPropertyDialog] = useState(false);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
-  const [showBookingDialog, setShowBookingDialog] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [showBookingDetail, setShowBookingDetail] = useState(false);
   const [viewMode, setViewMode] = useState<"monthly" | "timeline">("monthly");
@@ -90,7 +80,9 @@ export default function Dashboard() {
   const fetchProperties = useCallback(async () => {
     try {
       const res = await fetch("/api/properties");
+      if (!res.ok) return;
       const data = await res.json();
+      if (!Array.isArray(data)) return;
       setProperties(data);
       if (selectedIds.length === 0 && data.length > 0) {
         setSelectedIds(data.map((p: Property) => p.id));
@@ -134,7 +126,9 @@ export default function Dashboard() {
   };
 
   const handleSyncAll = async () => {
-    const propsWithIcal = properties.filter((p) => p.icalUrl);
+    const propsWithIcal = properties.filter(
+      (p) => p.icalUrl || (p as unknown as { icalFeeds?: { id: string }[] }).icalFeeds?.length
+    );
     for (const prop of propsWithIcal) {
       await handleSync(prop.id);
     }
@@ -173,45 +167,6 @@ export default function Dashboard() {
     await fetchProperties();
   };
 
-  const handleSaveBooking = async (data: {
-    summary: string;
-    startDate: string;
-    endDate: string;
-    propertyId: string;
-    status: string;
-  }) => {
-    await fetch("/api/bookings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    setShowBookingDialog(false);
-    await fetchProperties();
-  };
-
-  const handleDeleteBooking = async (id: string) => {
-    await fetch(`/api/bookings/${id}`, { method: "DELETE" });
-    setShowBookingDetail(false);
-    setSelectedBooking(null);
-    await fetchProperties();
-  };
-
-  const handleStatusChange = async (id: string, status: string) => {
-    await fetch(`/api/bookings/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    setShowBookingDetail(false);
-    setSelectedBooking(null);
-    await fetchProperties();
-  };
-
-  const handleDateClick = (date: Date) => {
-    setSelectedDate(date);
-    setShowBookingDialog(true);
-  };
-
   const handleBookingClick = (booking: Booking) => {
     setSelectedBooking(booking);
     setShowBookingDetail(true);
@@ -240,106 +195,47 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="flex flex-col items-center gap-3">
-          <Plane className="h-8 w-8 text-blue-500 animate-bounce" />
-          <span className="text-sm text-gray-400">Loading properties...</span>
+      <AppSidebar>
+        <div className="flex items-center justify-center h-full">
+          <RefreshCw className="h-5 w-5 animate-spin text-gray-400" />
         </div>
-      </div>
+      </AppSidebar>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* ── Header ── */}
-      <header className="bg-white border-b sticky top-0 z-30">
-        <div className="px-4 md:px-6 py-2.5 flex items-center justify-between">
-          {/* Left: Brand */}
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
-              <Plane className="h-4 w-4 text-white -rotate-45" />
-            </div>
-            <div>
-              <h1 className="text-base font-bold tracking-tight leading-none">
-                Air
-              </h1>
-              <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">
-                Property Manager
-              </span>
-            </div>
-            <Link
-              href="/inventory"
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+  const headerRight = (
+    <>
+          {/* View switcher */}
+          <div className="hidden md:flex items-center bg-gray-100 rounded-lg p-0.5">
+            <button
+              onClick={() => setViewMode("monthly")}
+              className={cn(
+                "flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors",
+                viewMode === "monthly"
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              )}
             >
-              <Package className="h-3.5 w-3.5" />
-              Inventory
-            </Link>
+              <CalendarDays className="h-3.5 w-3.5" />
+              Month
+            </button>
+            <button
+              onClick={() => setViewMode("timeline")}
+              className={cn(
+                "flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors",
+                viewMode === "timeline"
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              )}
+            >
+              <GanttChart className="h-3.5 w-3.5" />
+              Timeline
+            </button>
           </div>
 
-          {/* Right: Actions */}
-          <div className="flex items-center gap-2">
-            {/* View switcher */}
-            <div className="hidden md:flex items-center bg-gray-100 rounded-lg p-0.5">
-              <button
-                onClick={() => setViewMode("monthly")}
-                className={cn(
-                  "flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors",
-                  viewMode === "monthly"
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-500 hover:text-gray-700"
-                )}
-              >
-                <CalendarDays className="h-3.5 w-3.5" />
-                Month
-              </button>
-              <button
-                onClick={() => setViewMode("timeline")}
-                className={cn(
-                  "flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors",
-                  viewMode === "timeline"
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-500 hover:text-gray-700"
-                )}
-              >
-                <GanttChart className="h-3.5 w-3.5" />
-                Timeline
-              </button>
-            </div>
+          <div className="w-px h-5 bg-gray-200 hidden md:block" />
 
-            {/* Legend tooltip */}
-            <DropdownMenu>
-              <DropdownMenuTrigger className="h-8 w-8 hidden md:inline-flex items-center justify-center rounded-md hover:bg-gray-100">
-                <Info className="h-4 w-4 text-gray-400" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-52 p-3">
-                <div className="text-[10px] font-semibold text-gray-400 uppercase mb-2">Legend</div>
-                <div className="space-y-2 text-[11px] text-gray-600">
-                  <div className="flex items-center gap-2">
-                    <span className="w-6 h-2 rounded-sm bg-blue-500" />
-                    Confirmed / Checked-in
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-6 h-2 rounded-sm bg-blue-500 opacity-35 bar-checked-out" />
-                    Checked-out
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-6 h-2 rounded-sm bg-gray-400 opacity-70" />
-                    Blocked
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-4 h-4 rounded-full bg-amber-400 flex items-center justify-center shrink-0">
-                      <User className="h-2.5 w-2.5 text-gray-900" />
-                    </span>
-                    Cleaning needed
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-4 h-4 flex items-center justify-center text-amber-500 shrink-0">⚠</span>
-                    Same-day turnover
-                  </div>
-                </div>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
+          <div className="flex items-center gap-1.5">
             <Button
               variant="outline"
               size="sm"
@@ -364,17 +260,6 @@ export default function Dashboard() {
               onClick={() => setCurrentDate(new Date())}
             >
               Today
-            </Button>
-
-            <Button
-              size="sm"
-              onClick={() => {
-                setSelectedDate(undefined);
-                setShowBookingDialog(true);
-              }}
-            >
-              <Plus className="h-3.5 w-3.5 mr-1" />
-              <span className="hidden sm:inline">Booking</span>
             </Button>
 
             {/* Notifications */}
@@ -454,11 +339,6 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="gap-2 cursor-pointer">
-                  <Settings className="h-4 w-4 text-gray-400" />
-                  Settings
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="gap-2 cursor-pointer text-red-600"
                   onClick={() => logout()}
@@ -469,13 +349,15 @@ export default function Dashboard() {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-        </div>
-      </header>
+    </>
+  );
 
+  return (
+    <AppSidebar headerRight={headerRight}>
       {/* ── Main Content ── */}
-      <div className="flex gap-4 p-4 max-w-[1600px] mx-auto">
-        {/* Left sidebar */}
-        <div className="hidden md:flex flex-col gap-3 shrink-0 w-60">
+      <div className="flex gap-3 p-3 max-w-[1600px] mx-auto">
+        {/* Properties + Today sidebar */}
+        <div className="hidden md:flex flex-col gap-2 shrink-0 w-56">
           <PropertySidebar
             properties={properties}
             selectedIds={selectedIds}
@@ -493,12 +375,6 @@ export default function Dashboard() {
             syncing={syncing}
           />
 
-          <StatsBar
-            bookings={allBookings}
-            properties={properties.filter((p) => selectedIds.includes(p.id))}
-            currentDate={currentDate}
-          />
-
           <TodayPanel
             bookings={allBookings}
             onBookingClick={handleBookingClick}
@@ -506,7 +382,7 @@ export default function Dashboard() {
         </div>
 
         {/* Center: Calendar */}
-        <div className="flex-1 min-w-0 space-y-4">
+        <div className="flex-1 min-w-0 space-y-3">
 
           {/* Calendar / Timeline */}
           {viewMode === "monthly" ? (
@@ -514,7 +390,6 @@ export default function Dashboard() {
               bookings={allBookings}
               currentDate={currentDate}
               onDateChange={setCurrentDate}
-              onDateClick={handleDateClick}
               onBookingClick={handleBookingClick}
               selectedPropertyIds={selectedIds}
             />
@@ -523,7 +398,6 @@ export default function Dashboard() {
               properties={properties}
               currentDate={currentDate}
               onBookingClick={handleBookingClick}
-              onDateClick={handleDateClick}
               selectedPropertyIds={selectedIds}
             />
           )}
@@ -569,18 +443,6 @@ export default function Dashboard() {
         initial={editingProperty || undefined}
       />
 
-      <BookingDialog
-        open={showBookingDialog}
-        onClose={() => setShowBookingDialog(false)}
-        onSave={handleSaveBooking}
-        properties={properties.map((p) => ({
-          id: p.id,
-          name: p.name,
-          color: p.color,
-        }))}
-        initialDate={selectedDate}
-      />
-
       <BookingDetailDialog
         booking={selectedBooking}
         open={showBookingDetail}
@@ -588,9 +450,7 @@ export default function Dashboard() {
           setShowBookingDetail(false);
           setSelectedBooking(null);
         }}
-        onDelete={handleDeleteBooking}
-        onStatusChange={handleStatusChange}
       />
-    </div>
+    </AppSidebar>
   );
 }

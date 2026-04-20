@@ -79,7 +79,7 @@ export function StatsBar({ bookings, properties, currentDate }: StatsBarProps) {
   }, [bookings, properties, currentDate]);
 
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="grid grid-cols-2 gap-1.5">
       <StatCard
         icon={<Percent className="h-4 w-4" />}
         label="Occupancy Rate"
@@ -123,7 +123,7 @@ export function StatsBar({ bookings, properties, currentDate }: StatsBarProps) {
       />
       <StatCard
         icon={<Home className="h-4 w-4" />}
-        label="Properties"
+        label="Listings"
         value={stats.properties.toString()}
         color="text-gray-600"
         bgColor="bg-gray-50"
@@ -150,14 +150,14 @@ function StatCard({
   barColor?: string;
 }) {
   return (
-    <div className="bg-white rounded-xl border p-2.5">
+    <div className="bg-white rounded-lg border p-2">
       <div className="flex items-center gap-1.5 mb-0.5">
-        <div className={`p-1 rounded-md ${bgColor} ${color}`}>{icon}</div>
+        <div className={`p-0.5 rounded ${bgColor} ${color}`}>{icon}</div>
         <span className="text-[9px] font-medium text-gray-400 uppercase tracking-wider leading-tight">
           {label}
         </span>
       </div>
-      <div className={`text-lg font-bold ${color} mt-0.5`}>{value}</div>
+      <div className={`text-base font-bold ${color}`}>{value}</div>
       {bar !== undefined && barColor && (
         <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
           <div

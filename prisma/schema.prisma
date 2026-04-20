@@ -31,7 +31,7 @@ model Property {
   id          String   @id @default(cuid())
   name        String
   address     String?
-  icalUrl     String?  // iCal feed URL from Airbnb/Booking.com
+  icalUrl     String?  // legacy single iCal URL (deprecated, use icalFeeds)
   color       String   @default("#3b82f6") // for calendar display
   platform    String?  // airbnb, booking, etc
   notes       String?
@@ -44,8 +44,25 @@ model Property {
   bookings          Booking[]
   housekeepingTasks HousekeepingTask[]
   propertyStocks    PropertyStock[]
+  icalFeeds         ICalFeed[]
 
   @@map("properties")
+}
+
+model ICalFeed {
+  id          String   @id @default(cuid())
+  url         String
+  label       String?  // e.g. "Airbnb Main", "Booking.com"
+  platform    String   @default("airbnb") // airbnb, booking, agoda, other
+  lastSyncAt  DateTime?
+  lastError   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@map("ical_feeds")
 }
 
 model Booking {

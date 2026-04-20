@@ -86,13 +86,13 @@ export function PropertyDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {initial ? "Edit Property" : "Add Property"}
+            {initial ? "Edit Listing" : "Add Listing"}
           </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="name">Property Name</Label>
+            <Label htmlFor="name">Listing Name</Label>
             <Input
               id="name"
               value={name}
@@ -166,7 +166,7 @@ export function PropertyDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={!name.trim()}>
-              {initial ? "Save" : "Add Property"}
+              {initial ? "Save" : "Add Listing"}
             </Button>
           </div>
         </form>

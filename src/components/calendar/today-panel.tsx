@@ -64,11 +64,11 @@ export function TodayPanel({ bookings, onBookingClick }: TodayPanelProps) {
     currentlyStaying.length === 0
   ) {
     return (
-      <div className="bg-white rounded-xl border p-4">
-        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
+      <div className="bg-white rounded-lg border p-3">
+        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
           Today - {format(today, "d MMM")}
         </h3>
-        <p className="text-sm text-gray-400 text-center py-2">
+        <p className="text-sm text-gray-400 text-center py-1">
           No activities today
         </p>
       </div>
@@ -76,8 +76,8 @@ export function TodayPanel({ bookings, onBookingClick }: TodayPanelProps) {
   }
 
   return (
-    <div className="bg-white rounded-xl border p-4 space-y-3">
-      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+    <div className="bg-white rounded-lg border p-3 space-y-2">
+      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
         Today - {format(today, "d MMM")}
       </h3>
 

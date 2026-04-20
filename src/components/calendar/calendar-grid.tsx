@@ -13,8 +13,9 @@ import {
   addMonths,
   subMonths,
   differenceInCalendarDays,
+  isWithinInterval,
 } from "date-fns";
-import { ChevronLeft, ChevronRight, User, AlertTriangle } from "lucide-react";
+import { ChevronLeft, ChevronRight, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { getContrastTextColor } from "@/lib/color";
@@ -39,7 +40,6 @@ interface CalendarGridProps {
   bookings: Booking[];
   currentDate: Date;
   onDateChange: (date: Date) => void;
-  onDateClick?: (date: Date) => void;
   onBookingClick?: (booking: Booking) => void;
   selectedPropertyIds: string[];
 }
@@ -86,7 +86,6 @@ export function CalendarGrid({
   bookings,
   currentDate,
   onDateChange,
-  onDateClick,
   onBookingClick,
 }: CalendarGridProps) {
   // Build calendar days split into weeks
@@ -190,7 +189,7 @@ export function CalendarGrid({
     });
   }, [weeks, bookings]);
 
-  // Check which days need cleaning (checkout day)
+  // Check which days need cleaning (checkout day — includes same-day turnovers)
   const cleaningDays = useMemo(() => {
     const set = new Set<string>();
     for (const b of bookings) {
@@ -200,60 +199,102 @@ export function CalendarGrid({
     return set;
   }, [bookings]);
 
-  // Detect same-day turnovers (a checkout and checkin on the same day)
-  const turnoverDays = useMemo(() => {
-    const checkouts = new Set<string>();
-    const checkins = new Set<string>();
-    for (const b of bookings) {
-      if (b.status === "CANCELLED" || b.status === "BLOCKED") continue;
-      checkouts.add(format(new Date(b.endDate), "yyyy-MM-dd"));
-      checkins.add(format(new Date(b.startDate), "yyyy-MM-dd"));
+  // Stats for the current month
+  const monthStats = useMemo(() => {
+    const monthStart = startOfMonth(currentDate);
+    const monthEnd = endOfMonth(currentDate);
+    const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+    const propertyIds = new Set(bookings.map((b) => b.propertyId));
+    const totalSlots = daysInMonth.length * (propertyIds.size || 1);
+
+    const activeBookings = bookings.filter(
+      (b) => b.status !== "CANCELLED" && b.status !== "BLOCKED"
+    );
+
+    // Only count bookings that overlap with this month
+    const monthBookings = activeBookings.filter((b) => {
+      const bStart = new Date(b.startDate);
+      const bEnd = new Date(b.endDate);
+      return bStart <= monthEnd && bEnd >= monthStart;
+    });
+
+    let bookedNights = 0;
+    for (const day of daysInMonth) {
+      for (const pid of propertyIds) {
+        const hasBooking = monthBookings.some((b) => {
+          if (b.propertyId !== pid) return false;
+          const start = new Date(b.startDate);
+          const end = new Date(b.endDate);
+          end.setDate(end.getDate() - 1);
+          return isWithinInterval(day, { start, end }) || isSameDay(day, start);
+        });
+        if (hasBooking) bookedNights++;
+      }
     }
-    const set = new Set<string>();
-    for (const d of checkouts) {
-      if (checkins.has(d)) set.add(d);
-    }
-    return set;
-  }, [bookings]);
+
+    const occupancy = totalSlots > 0 ? Math.round((bookedNights / totalSlots) * 100) : 0;
+
+    return { occupancy, bookedNights, bookingCount: monthBookings.length, properties: propertyIds.size };
+  }, [bookings, currentDate]);
 
   const today = new Date();
-  const BAR_HEIGHT = 22;
-  const BAR_GAP = 3;
-  const BAR_TOP_OFFSET = 30; // space for date number
+  const BAR_HEIGHT = 20;
+  const BAR_GAP = 2;
+  const BAR_TOP_OFFSET = 26; // space for date number
 
   return (
     <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3 border-b bg-gray-50/50">
+      <div className="flex items-center justify-between px-4 py-2 border-b bg-gray-50/50">
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8"
+          className="h-7 w-7"
           onClick={() => onDateChange(subMonths(currentDate, 1))}
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <h2 className="text-base font-semibold tracking-tight">
-          {format(currentDate, "MMMM yyyy")}
+        <h2 className="text-sm font-black tracking-tight">
+          {format(currentDate, "MMMM")}<span className="ml-1.5">{format(currentDate, "yyyy")}</span>
         </h2>
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8"
+          className="h-7 w-7"
           onClick={() => onDateChange(addMonths(currentDate, 1))}
         >
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
 
+      {/* Stats summary */}
+      <div className="flex items-center justify-center gap-3 px-4 py-1.5 border-b bg-gray-50/60 text-[11px]">
+        <div className={cn(
+          "flex items-center gap-1.5 px-2 py-0.5 rounded-full",
+          monthStats.occupancy >= 80 ? "bg-emerald-50 text-emerald-700" :
+          monthStats.occupancy >= 50 ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-600"
+        )}>
+          <span className="font-bold">{monthStats.occupancy}%</span>
+          <span className="opacity-70">occ</span>
+        </div>
+        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
+          <span className="font-bold">{monthStats.bookedNights}</span>
+          <span className="opacity-70">nights</span>
+        </div>
+        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+          <span className="font-bold">{monthStats.bookingCount}</span>
+          <span className="opacity-70">bookings</span>
+        </div>
+      </div>
+
       {/* Day headers */}
-      <div className="grid grid-cols-7 border-b bg-gray-50/30">
+      <div className="grid grid-cols-7 border-b bg-gray-200/60 divide-x divide-gray-300/50">
         {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
           <div
             key={d}
             className={cn(
-              "py-2 text-center text-[11px] font-semibold uppercase tracking-wider",
-              d === "Sat" || d === "Sun" ? "text-gray-400" : "text-gray-500"
+              "py-1.5 text-center text-[10px] font-semibold uppercase tracking-wider",
+              d === "Sat" || d === "Sun" ? "text-rose-400" : "text-gray-500"
             )}
           >
             {d}
@@ -267,8 +308,8 @@ export function CalendarGrid({
           const wbookings = weekBookings[wi];
           const maxLane = wbookings.reduce((m, b) => Math.max(m, b.lane), -1);
           const rowHeight = Math.max(
-            110,
-            BAR_TOP_OFFSET + (maxLane + 1) * (BAR_HEIGHT + BAR_GAP) + 8
+            90,
+            BAR_TOP_OFFSET + (maxLane + 1) * (BAR_HEIGHT + BAR_GAP) + 6
           );
 
           return (
@@ -280,7 +321,6 @@ export function CalendarGrid({
                 const isWeekend = di >= 5;
                 const dayKey = format(day, "yyyy-MM-dd");
                 const needsCleaning = cleaningDays.has(dayKey);
-                const isTurnover = turnoverDays.has(dayKey);
                 const dayHasBooking = wbookings.some(
                   (wb) => di >= wb.startCol && di <= wb.endCol
                 );
@@ -289,54 +329,35 @@ export function CalendarGrid({
                   <div
                     key={di}
                     className={cn(
-                      "border-b border-r relative transition-colors",
+                      "border-b border-r border-gray-200/60 relative transition-colors",
                       di === 0 && "border-l",
                       !isCurrentMonth && "bg-gray-50/60",
-                      isWeekend && isCurrentMonth && "bg-slate-50/40",
-                      isCurrentMonth && !dayHasBooking && "cursor-pointer hover:bg-blue-50/30 group"
+                      isWeekend && isCurrentMonth && "bg-slate-50/40"
                     )}
                     style={{ height: rowHeight }}
-                    onClick={() => {
-                      if (isCurrentMonth) onDateClick?.(day);
-                    }}
                   >
                     {/* Date number + cleaning icon */}
-                    <div className="flex items-center justify-between px-1.5 py-1 relative z-20">
+                    <div className="flex items-center justify-between px-1 py-0.5 relative z-20">
                       <div
                         className={cn(
-                          "text-sm font-medium w-7 h-7 flex items-center justify-center rounded-full",
+                          "text-xs font-medium w-5 h-5 flex items-center justify-center rounded-full",
                           !isCurrentMonth && "text-gray-300",
                           isCurrentMonth && !isToday && "text-gray-700",
-                          isToday && "bg-blue-600 text-white font-bold shadow-sm"
+                          isToday && "bg-emerald-600 text-white font-bold"
                         )}
                       >
                         {format(day, "d")}
                       </div>
-                      {isTurnover ? (
+                      {needsCleaning && (
                         <div
-                          className="w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center"
-                          title="Same-day turnover! Checkout + Checkin"
-                        >
-                          <AlertTriangle className="h-3 w-3 text-amber-600" />
-                        </div>
-                      ) : needsCleaning ? (
-                        <div
-                          className="w-5 h-5 rounded-full bg-amber-400 flex items-center justify-center"
+                          className="w-4 h-4 rounded-full bg-amber-400 flex items-center justify-center"
                           title="Cleaning needed"
                         >
-                          <User className="h-3 w-3 text-gray-900" />
+                          <User className="h-2.5 w-2.5 text-gray-900" />
                         </div>
-                      ) : null}
+                      )}
                     </div>
 
-                    {/* "+ Add" hint on empty days */}
-                    {isCurrentMonth && !dayHasBooking && (
-                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
-                        <span className="text-[10px] text-blue-400 font-medium bg-blue-50 px-2 py-0.5 rounded-full">
-                          + Add
-                        </span>
-                      </div>
-                    )}
                   </div>
                 );
               })}

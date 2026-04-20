@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { AppSidebar } from "@/components/app-sidebar";
 
 // ─── Types ───────────────────────────────────────────────────────────
 interface PropertyStock {
@@ -238,9 +239,11 @@ export default function InventoryPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <Package className="h-8 w-8 text-gray-400 animate-pulse" />
-      </div>
+      <AppSidebar>
+        <div className="flex items-center justify-center h-full">
+          <Package className="h-5 w-5 text-gray-400 animate-pulse" />
+        </div>
+      </AppSidebar>
     );
   }
 
@@ -252,52 +255,34 @@ export default function InventoryPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-30">
-        <div className="px-4 md:px-6 py-2.5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-2.5">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
-                <Plane className="h-4 w-4 text-white -rotate-45" />
-              </div>
-              <span className="text-base font-bold tracking-tight">Air</span>
-            </Link>
-            <ChevronLeft className="h-4 w-4 text-gray-300" />
-            <div className="flex items-center gap-2">
-              <Package className="h-4 w-4 text-gray-500" />
-              <span className="text-sm font-semibold text-gray-700">Inventory</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link
-              href="/inventory/counter"
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
-            >
-              <ShoppingCart className="h-3.5 w-3.5" />
-              Counter
-            </Link>
-            <Link
-              href="/inventory/items"
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
-            >
-              <Package className="h-3.5 w-3.5" />
-              Items
-            </Link>
-            {todayData && todayData.lowStockItems.length > 0 && (
-              <button onClick={() => setTab("stock")} className="flex items-center gap-1 px-2 py-1 bg-red-50 text-red-600 rounded-full text-xs font-semibold hover:bg-red-100 transition-colors">
-                <AlertTriangle className="h-3 w-3" />
-                {todayData.lowStockItems.length} Low Stock
-              </button>
-            )}
-            <Button size="sm" onClick={() => tab === "maintenance" ? setShowAddTask(true) : tab === "stock" ? setShowAddItem(true) : setShowAddItem(true)}>
-              <Plus className="h-3.5 w-3.5 mr-1" />
-              {tab === "maintenance" ? "Task" : "Item"}
-            </Button>
-          </div>
-        </div>
-      </header>
-
+    <AppSidebar headerRight={
+      <div className="flex items-center gap-2">
+        <Link
+          href="/inventory/counter"
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+        >
+          <ShoppingCart className="h-3.5 w-3.5" />
+          Counter
+        </Link>
+        <Link
+          href="/inventory/items"
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+        >
+          <Package className="h-3.5 w-3.5" />
+          Items
+        </Link>
+        {todayData && todayData.lowStockItems.length > 0 && (
+          <button onClick={() => setTab("stock")} className="flex items-center gap-1 px-2 py-1 bg-red-50 text-red-600 rounded-full text-xs font-semibold hover:bg-red-100 transition-colors">
+            <AlertTriangle className="h-3 w-3" />
+            {todayData.lowStockItems.length} Low Stock
+          </button>
+        )}
+        <Button size="sm" onClick={() => tab === "maintenance" ? setShowAddTask(true) : tab === "stock" ? setShowAddItem(true) : setShowAddItem(true)}>
+          <Plus className="h-3.5 w-3.5 mr-1" />
+          {tab === "maintenance" ? "Task" : "Item"}
+        </Button>
+      </div>
+    }>
       <div className="max-w-[1200px] mx-auto p-4 space-y-4">
         {/* Tabs */}
         <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5 w-fit">
@@ -656,7 +641,7 @@ export default function InventoryPage() {
       <AddItemDialog open={showAddItem} onClose={() => setShowAddItem(false)} onSave={handleAddItem} />
       <StockOpDialog item={showStockOp} properties={properties} open={!!showStockOp} onClose={() => setShowStockOp(null)} onSave={handleStockOp} />
       <AddTaskDialog properties={properties} open={showAddTask} onClose={() => setShowAddTask(false)} onSave={handleAddTask} />
-    </div>
+    </AppSidebar>
   );
 }
 

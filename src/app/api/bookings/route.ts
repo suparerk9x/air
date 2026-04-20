@@ -3,7 +3,6 @@ import { prisma } from "@/lib/prisma";
 import {
   getAuthUserId,
   getUserPropertyIds,
-  verifyPropertyOwnership,
   unauthorizedResponse,
   forbiddenResponse,
 } from "@/lib/auth-api";
@@ -40,42 +39,6 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json(bookings);
-  } catch {
-    return unauthorizedResponse();
-  }
-}
-
-// POST /api/bookings - create manual booking
-export async function POST(req: NextRequest) {
-  try {
-    const userId = await getAuthUserId();
-    const body = await req.json();
-    const { summary, startDate, endDate, propertyId, status, notes } = body;
-
-    if (!startDate || !endDate || !propertyId) {
-      return NextResponse.json(
-        { error: "startDate, endDate, and propertyId are required" },
-        { status: 400 }
-      );
-    }
-
-    if (!(await verifyPropertyOwnership(propertyId, userId))) {
-      return forbiddenResponse();
-    }
-
-    const booking = await prisma.booking.create({
-      data: {
-        summary,
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
-        propertyId,
-        status: status || "CONFIRMED",
-        source: "manual",
-        notes,
-      },
-    });
-
-    return NextResponse.json(booking, { status: 201 });
   } catch {
     return unauthorizedResponse();
   }
