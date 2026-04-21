@@ -4,12 +4,14 @@ Deployment configuration for **Air** (Airbnb Co-host Property & Calendar Managem
 
 ## Quick Info
 
+| App | URL | PM2 Name | Port |
+|-----|-----|----------|------|
+| Web | https://air.lightepic.com | `air` | 3200 |
+| Admin | https://air-admin.lightepic.com | `air-admin` | 3201 |
+
 | Key | Value |
 |-----|-------|
-| URL | https://air.lightepic.com |
 | Server | `161.33.204.39` (Oracle Cloud ARM) |
-| PM2 Name | `air` |
-| Port | 3200 |
 | Database | PostgreSQL `air` on `docker-db_postgres-1` |
 | Repo | https://github.com/suparerk9x/air |
 | Path on server | `/home/ubuntu/apps/air` |
@@ -37,7 +39,8 @@ All scripts run from **project root** (`d:\Antigravity\Air`):
 | Script | Usage | Description |
 |--------|-------|-------------|
 | `connect.sh` | `bash oracle/scripts/connect.sh` | SSH into the server |
-| `deploy.sh` | `bash oracle/scripts/deploy.sh` | Push to GitHub, pull on server, build, reload PM2 |
+| `deploy.sh` | `bash oracle/scripts/deploy.sh` | Deploy web app (push, build, reload PM2) |
+| `deploy-admin.sh` | `bash oracle/scripts/deploy-admin.sh` | Deploy admin app (push, build, reload PM2) |
 | `backup.sh` | `bash oracle/scripts/backup.sh` | Dump `air` database and download to `oracle/backups/` |
 | `monitor.sh` | `bash oracle/scripts/monitor.sh` | Show app status, resources, DB size, health check |
 
@@ -56,14 +59,17 @@ The SSH key is at `oracle/.ssh/oracle-arm.key` (git-ignored, never committed).
 ## Deploy
 
 ```bash
-# One command
+# Deploy web app
 bash oracle/scripts/deploy.sh
 
-# What it does:
+# Deploy admin app
+bash oracle/scripts/deploy-admin.sh
+
+# What each does:
 # 1. git push origin master
 # 2. SSH to server
 # 3. git pull → npm install → prisma generate → prisma migrate → npm run build
-# 4. pm2 reload air
+# 4. pm2 reload
 ```
 
 ## Environment (.env on server)
@@ -90,12 +96,28 @@ Located at `/home/ubuntu/apps/air/.env` on the server.
 
 Managed at https://nginx.lightepic.com
 
+### Web App
+
 | Setting | Value |
 |---------|-------|
 | Domain | `air.lightepic.com` |
 | Scheme | http |
 | Forward Host | 172.17.0.1 |
 | Forward Port | 3200 |
+| SSL | Custom Certificate (lightepic.com wildcard) |
+| Force SSL | Yes |
+| HTTP/2 | Yes |
+| Block Exploits | Yes |
+| Websockets | Yes |
+
+### Admin App
+
+| Setting | Value |
+|---------|-------|
+| Domain | `air-admin.lightepic.com` |
+| Scheme | http |
+| Forward Host | 172.17.0.1 |
+| Forward Port | 3201 |
 | SSL | Custom Certificate (lightepic.com wildcard) |
 | Force SSL | Yes |
 | HTTP/2 | Yes |
@@ -118,11 +140,11 @@ docker exec -it docker-db_postgres-1 psql -U postgres -d air
 ## PM2 Commands (on server)
 
 ```bash
-pm2 list | grep air        # Status
-pm2 logs air --lines 50    # Logs
-pm2 reload air              # Zero-downtime reload
-pm2 restart air             # Hard restart
-pm2 stop air                # Stop
+pm2 list | grep air        # Status (both apps)
+pm2 logs air --lines 50    # Web app logs
+pm2 logs air-admin --lines 50  # Admin app logs
+pm2 reload air              # Reload web
+pm2 reload air-admin        # Reload admin
 ```
 
 ## Seed Demo Data

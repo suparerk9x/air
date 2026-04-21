@@ -20,6 +20,8 @@ import {
   Check,
   RotateCcw,
   AlertTriangle,
+  X,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -63,7 +65,9 @@ export default function StockCounterPage() {
   const [selectedProperty, setSelectedProperty] = useState("");
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     const [itemsRes, propsRes] = await Promise.all([
@@ -80,13 +84,20 @@ export default function StockCounterPage() {
     setLoading(false);
   }, [selectedProperty]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   // Get system stock for selected property
-  const getSystemStock = (item: InventoryItem) => {
-    const ps = item.propertyStocks.find((s) => s.property.id === selectedProperty);
-    return ps?.quantity ?? 0;
-  };
+  const getSystemStock = useCallback(
+    (item: InventoryItem) => {
+      const ps = item.propertyStocks.find(
+        (s) => s.property.id === selectedProperty
+      );
+      return ps?.quantity ?? 0;
+    },
+    [selectedProperty]
+  );
 
   // Group items by category
   const grouped = useMemo(() => {
@@ -99,22 +110,67 @@ export default function StockCounterPage() {
     return map;
   }, [items]);
 
+  // Categories that have items
+  const availableCategories = useMemo(() => {
+    return CATEGORIES.filter((c) => grouped.has(c.value));
+  }, [grouped]);
+
+  // Items to show in the left grid (filtered by active category or all)
+  const gridItems = useMemo(() => {
+    if (activeCategory) {
+      return grouped.get(activeCategory) || [];
+    }
+    const all: InventoryItem[] = [];
+    for (const cat of CATEGORIES) {
+      const catItems = grouped.get(cat.value);
+      if (catItems) all.push(...catItems);
+    }
+    return all;
+  }, [grouped, activeCategory]);
+
   const setQty = (itemId: string, value: number) => {
-    setQuantities((prev) => ({ ...prev, [itemId]: Math.max(0, value) }));
+    setQuantities((prev) => {
+      const next = { ...prev };
+      if (value <= 0) {
+        delete next[itemId];
+      } else {
+        next[itemId] = value;
+      }
+      return next;
+    });
   };
 
   const getQty = (itemId: string) => quantities[itemId] ?? 0;
 
-  // Cart summary
-  const cartItems = useMemo(() => {
-    return items.filter((i) => getQty(i.id) > 0).map((i) => ({
-      ...i,
-      qty: getQty(i.id),
+  // Tap to add +1
+  const tapItem = (itemId: string) => {
+    setQuantities((prev) => ({
+      ...prev,
+      [itemId]: (prev[itemId] ?? 0) + 1,
     }));
+  };
+
+  // Cart items (items with qty > 0)
+  const cartItems = useMemo(() => {
+    return items
+      .filter((i) => getQty(i.id) > 0)
+      .map((i) => ({
+        ...i,
+        qty: getQty(i.id),
+        systemQty: getSystemStock(i),
+      }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, quantities, getSystemStock]);
+
+  // Progress for count mode: % of total items that have been counted
+  const progress = useMemo(() => {
+    if (items.length === 0) return { counted: 0, total: 0, percent: 0 };
+    const counted = Object.keys(quantities).length;
+    const total = items.length;
+    return { counted, total, percent: Math.round((counted / total) * 100) };
   }, [items, quantities]);
 
-  const totalItems = cartItems.reduce((s, i) => s + i.qty, 0);
+  const allCounted = progress.counted === progress.total && progress.total > 0;
 
   const handleReset = () => {
     setQuantities({});
@@ -123,6 +179,7 @@ export default function StockCounterPage() {
 
   const handleSubmit = async () => {
     if (cartItems.length === 0) return;
+    setSubmitting(true);
 
     for (const item of cartItems) {
       if (mode === "restock") {
@@ -139,8 +196,7 @@ export default function StockCounterPage() {
         });
       } else {
         // Stock count mode: calculate diff and adjust
-        const systemQty = getSystemStock(item);
-        const diff = item.qty - systemQty;
+        const diff = item.qty - item.systemQty;
         if (diff !== 0) {
           await fetch("/api/inventory/stock", {
             method: "POST",
@@ -150,13 +206,14 @@ export default function StockCounterPage() {
               propertyId: selectedProperty,
               type: "ADJUSTMENT",
               quantity: diff,
-              note: `Stock count: system ${systemQty} → actual ${item.qty} (diff ${diff > 0 ? "+" : ""}${diff})`,
+              note: `Stock count: system ${item.systemQty} → actual ${item.qty} (diff ${diff > 0 ? "+" : ""}${diff})`,
             }),
           });
         }
       }
     }
 
+    setSubmitting(false);
     setSubmitted(true);
     setTimeout(() => {
       handleReset();
@@ -186,7 +243,7 @@ export default function StockCounterPage() {
             {mode === "restock" ? "Restock Saved!" : "Stock Count Saved!"}
           </h2>
           <p className="text-sm text-gray-500">
-            {totalItems} items updated for {selectedProp?.name}
+            {cartItems.length} items updated for {selectedProp?.name}
           </p>
         </div>
       </div>
@@ -205,227 +262,440 @@ export default function StockCounterPage() {
               </div>
             </Link>
             <ChevronLeft className="h-4 w-4 text-gray-300" />
-            <span className="text-sm font-semibold text-gray-700">Stock Counter</span>
+            <span className="text-sm font-semibold text-gray-700">
+              Stock Counter
+            </span>
           </div>
-          <Button variant="ghost" size="sm" onClick={handleReset} className="text-gray-500">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleReset}
+            className="text-gray-500"
+          >
             <RotateCcw className="h-3.5 w-3.5 mr-1" /> Reset
           </Button>
         </div>
+
+        {/* Mode + Property */}
+        <div className="px-4 pb-3 flex items-center gap-3">
+          {/* Mode toggle */}
+          <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5">
+            <button
+              onClick={() => {
+                setMode("restock");
+                handleReset();
+              }}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all touch-manipulation",
+                mode === "restock"
+                  ? "bg-white text-green-700 shadow-sm"
+                  : "text-gray-500"
+              )}
+            >
+              <ShoppingCart className="h-3.5 w-3.5" />
+              Restock
+            </button>
+            <button
+              onClick={() => {
+                setMode("count");
+                handleReset();
+              }}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all touch-manipulation",
+                mode === "count"
+                  ? "bg-white text-blue-700 shadow-sm"
+                  : "text-gray-500"
+              )}
+            >
+              <ClipboardCheck className="h-3.5 w-3.5" />
+              Count
+            </button>
+          </div>
+
+          {/* Property selector */}
+          <Select
+            value={selectedProperty}
+            onValueChange={(v) => {
+              if (v) {
+                setSelectedProperty(v);
+                handleReset();
+              }
+            }}
+          >
+            <SelectTrigger className="flex-1 max-w-[200px]">
+              <div className="flex items-center gap-2">
+                {selectedProp && (
+                  <div
+                    className="w-3 h-3 rounded-full shrink-0"
+                    style={{ backgroundColor: selectedProp.color }}
+                  />
+                )}
+                <SelectValue placeholder="Select property" />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              {properties.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: p.color }}
+                    />
+                    {p.name}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </header>
 
-      {/* ── Mode + Property selector ── */}
-      <div className="bg-white border-b px-4 py-3 space-y-3">
-        {/* Mode toggle */}
-        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
-          <button
-            onClick={() => { setMode("restock"); handleReset(); }}
-            className={cn(
-              "flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition-colors",
-              mode === "restock" ? "bg-white text-green-700 shadow-sm" : "text-gray-500"
-            )}
-          >
-            <ShoppingCart className="h-4 w-4" />
-            Restock
-          </button>
-          <button
-            onClick={() => { setMode("count"); handleReset(); }}
-            className={cn(
-              "flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition-colors",
-              mode === "count" ? "bg-white text-blue-700 shadow-sm" : "text-gray-500"
-            )}
-          >
-            <ClipboardCheck className="h-4 w-4" />
-            Stock Count
-          </button>
+      {/* ── Split Screen ── */}
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        {/* ─── LEFT: Item Grid (tap to count) ─── */}
+        <div className="flex-[2] flex flex-col border-r bg-white overflow-hidden">
+          {/* Category filter tabs */}
+          <div className="flex items-center gap-1 px-3 py-2 border-b overflow-x-auto shrink-0 scrollbar-thin">
+            <button
+              onClick={() => setActiveCategory(null)}
+              className={cn(
+                "px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors touch-manipulation",
+                activeCategory === null
+                  ? "bg-gray-800 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              )}
+            >
+              All
+            </button>
+            {availableCategories.map((c) => (
+              <button
+                key={c.value}
+                onClick={() =>
+                  setActiveCategory(activeCategory === c.value ? null : c.value)
+                }
+                className={cn(
+                  "px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors touch-manipulation",
+                  activeCategory === c.value
+                    ? "bg-gray-800 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                )}
+              >
+                {c.icon} {c.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Item grid */}
+          <div className="flex-1 overflow-y-auto p-3">
+            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+              {gridItems.map((item) => {
+                const qty = getQty(item.id);
+                const systemQty = getSystemStock(item);
+                const isLow =
+                  systemQty <= item.minStock && systemQty > 0;
+                const isOut = systemQty === 0;
+                const cat = CATEGORIES.find((c) => c.value === item.category);
+
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => tapItem(item.id)}
+                    className={cn(
+                      "relative flex flex-col items-center p-3 rounded-xl border-2 transition-all",
+                      "active:scale-95 touch-manipulation select-none",
+                      "hover:shadow-md",
+                      qty > 0 && mode === "restock" && "border-green-400 bg-green-50 shadow-sm",
+                      qty > 0 && mode === "count" && "border-blue-400 bg-blue-50 shadow-sm",
+                      qty === 0 && "border-gray-200 bg-white hover:border-gray-300"
+                    )}
+                  >
+                    {/* Quantity badge */}
+                    {qty > 0 && (
+                      <div
+                        className={cn(
+                          "absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-sm",
+                          mode === "restock" ? "bg-green-500" : "bg-blue-500"
+                        )}
+                      >
+                        {qty}
+                      </div>
+                    )}
+
+                    {/* Status dot */}
+                    {(isLow || isOut) && qty === 0 && (
+                      <div
+                        className={cn(
+                          "absolute top-1.5 left-1.5 w-2 h-2 rounded-full",
+                          isOut ? "bg-red-500" : "bg-amber-400"
+                        )}
+                      />
+                    )}
+
+                    {/* Image / Icon */}
+                    <div className="w-12 h-12 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center text-2xl mb-1.5">
+                      {item.imageUrl ? (
+                        <Image
+                          src={item.imageUrl}
+                          alt={item.name}
+                          width={48}
+                          height={48}
+                          className="object-cover w-full h-full"
+                        />
+                      ) : (
+                        cat?.icon || "📦"
+                      )}
+                    </div>
+
+                    {/* Name */}
+                    <div className="text-[11px] font-medium text-gray-700 text-center leading-tight line-clamp-2 w-full">
+                      {item.name}
+                    </div>
+
+                    {/* System stock */}
+                    <div
+                      className={cn(
+                        "text-[10px] mt-0.5",
+                        isOut
+                          ? "text-red-500 font-semibold"
+                          : isLow
+                          ? "text-amber-500 font-semibold"
+                          : "text-gray-400"
+                      )}
+                    >
+                      {systemQty} {item.unit}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
-        {/* Property selector */}
-        <Select value={selectedProperty} onValueChange={(v) => { v && setSelectedProperty(v); handleReset(); }}>
-          <SelectTrigger className="w-full">
-            <div className="flex items-center gap-2">
-              {selectedProp && (
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: selectedProp.color }} />
-              )}
-              <SelectValue placeholder="Select property" />
+        {/* ─── RIGHT: Count/Restock List ─── */}
+        <div className="flex-[3] flex flex-col bg-gray-50 overflow-hidden">
+          {/* Progress bar (count mode) */}
+          {mode === "count" && (
+            <div className="px-4 pt-3 pb-2 shrink-0">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-medium text-gray-500">
+                  Progress
+                </span>
+                <span className="text-xs font-bold text-gray-700">
+                  {progress.counted} / {progress.total} items ({progress.percent}%)
+                </span>
+              </div>
+              <div className="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className={cn(
+                    "h-full rounded-full transition-all duration-300",
+                    allCounted ? "bg-green-500" : "bg-blue-500"
+                  )}
+                  style={{ width: `${progress.percent}%` }}
+                />
+              </div>
             </div>
-          </SelectTrigger>
-          <SelectContent>
-            {properties.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} />
-                  {p.name}
+          )}
+
+          {/* Counted items list */}
+          <div className="flex-1 overflow-y-auto px-4 py-2">
+            {cartItems.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-3">
+                  {mode === "restock" ? (
+                    <ShoppingCart className="h-7 w-7 text-gray-300" />
+                  ) : (
+                    <ClipboardCheck className="h-7 w-7 text-gray-300" />
+                  )}
                 </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* ── Item grid ── */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pb-28">
-        {CATEGORIES.map((cat) => {
-          const catItems = grouped.get(cat.value);
-          if (!catItems || catItems.length === 0) return null;
-
-          return (
-            <div key={cat.value}>
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                <span>{cat.icon}</span> {cat.label}
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {catItems.map((item) => {
-                  const qty = getQty(item.id);
-                  const systemQty = getSystemStock(item);
-                  const hasValue = qty > 0;
-                  const diff = mode === "count" && hasValue ? qty - systemQty : 0;
+                <p className="text-sm font-medium">
+                  {mode === "restock"
+                    ? "Tap items to restock"
+                    : "Tap items to start counting"}
+                </p>
+                <p className="text-xs mt-1">
+                  Each tap adds +1 to the count
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {cartItems.map((item) => {
+                  const diff = item.qty - item.systemQty;
+                  const cat = CATEGORIES.find(
+                    (c) => c.value === item.category
+                  );
 
                   return (
                     <div
                       key={item.id}
                       className={cn(
                         "bg-white rounded-xl border px-4 py-3 flex items-center gap-3 transition-all",
-                        hasValue && mode === "restock" && "border-green-300 bg-green-50/30",
-                        hasValue && mode === "count" && diff === 0 && "border-blue-300 bg-blue-50/30",
-                        hasValue && mode === "count" && diff !== 0 && "border-amber-300 bg-amber-50/30"
+                        mode === "restock" && "border-green-200",
+                        mode === "count" && diff === 0 && "border-green-200",
+                        mode === "count" && diff !== 0 && "border-amber-200"
                       )}
                     >
-                      {/* Item image */}
+                      {/* Image */}
                       <div className="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden shrink-0 flex items-center justify-center text-lg">
                         {item.imageUrl ? (
-                          <Image src={item.imageUrl} alt={item.name} width={40} height={40} className="object-cover w-full h-full" />
+                          <Image
+                            src={item.imageUrl}
+                            alt={item.name}
+                            width={40}
+                            height={40}
+                            className="object-cover w-full h-full"
+                          />
                         ) : (
-                          CATEGORIES.find((c) => c.value === item.category)?.icon || "📦"
+                          cat?.icon || "📦"
                         )}
                       </div>
-                      {/* Item info */}
+
+                      {/* Info */}
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">{item.name}</div>
-                        <div className="text-[10px] text-gray-400">
-                          {mode === "count" ? (
-                            <span>System: <span className="font-semibold text-gray-600">{systemQty}</span> {item.unit}</span>
-                          ) : (
-                            <span>Current: {systemQty} {item.unit}</span>
-                          )}
+                        <div className="text-sm font-medium truncate">
+                          {item.name}
                         </div>
-                        {/* Diff indicator for count mode */}
-                        {mode === "count" && hasValue && (
-                          <div className={cn(
-                            "text-[10px] font-semibold mt-0.5",
-                            diff === 0 ? "text-green-600" : "text-amber-600"
-                          )}>
-                            {diff === 0 ? "✓ Match" : (
-                              <span className="flex items-center gap-0.5">
+                        {mode === "count" ? (
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[10px] text-gray-400">
+                              System:{" "}
+                              <span className="font-semibold text-gray-600">
+                                {item.systemQty}
+                              </span>
+                            </span>
+                            {diff === 0 ? (
+                              <span className="text-[10px] font-semibold text-green-600">
+                                ✓ Match
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-semibold text-amber-600 flex items-center gap-0.5">
                                 <AlertTriangle className="h-3 w-3" />
-                                Diff: {diff > 0 ? "+" : ""}{diff}
+                                {diff > 0 ? "+" : ""}
+                                {diff}
                               </span>
                             )}
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-gray-400 mt-0.5">
+                            Current: {item.systemQty} {item.unit} → {item.systemQty + item.qty}
                           </div>
                         )}
                       </div>
 
-                      {/* Counter */}
-                      <div className="flex items-center gap-0">
+                      {/* +/- Controls */}
+                      <div className="flex items-center gap-0 shrink-0">
                         <button
-                          onClick={() => setQty(item.id, qty - 1)}
-                          disabled={qty === 0}
+                          onClick={() => setQty(item.id, item.qty - 1)}
                           className={cn(
-                            "w-10 h-10 rounded-l-xl flex items-center justify-center transition-colors border",
-                            qty === 0
-                              ? "bg-gray-50 text-gray-300 border-gray-200"
-                              : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100 active:bg-gray-200"
+                            "w-9 h-9 rounded-l-lg flex items-center justify-center transition-colors border",
+                            "bg-white text-gray-600 border-gray-300 hover:bg-gray-100 active:bg-gray-200 active:scale-95 touch-manipulation"
                           )}
                         >
-                          <Minus className="h-4 w-4" />
+                          <Minus className="h-3.5 w-3.5" />
                         </button>
-                        <div className={cn(
-                          "w-14 h-10 flex items-center justify-center text-lg font-bold border-y",
-                          hasValue
-                            ? mode === "restock" ? "bg-green-50 text-green-700 border-green-300" : "bg-blue-50 text-blue-700 border-blue-300"
-                            : "bg-gray-50 text-gray-400 border-gray-200"
-                        )}>
-                          {qty}
+                        <div
+                          className={cn(
+                            "w-12 h-9 flex items-center justify-center text-base font-bold border-y tabular-nums",
+                            mode === "restock"
+                              ? "bg-green-50 text-green-700 border-green-300"
+                              : "bg-blue-50 text-blue-700 border-blue-300"
+                          )}
+                        >
+                          {item.qty}
                         </div>
                         <button
-                          onClick={() => setQty(item.id, qty + 1)}
+                          onClick={() => setQty(item.id, item.qty + 1)}
                           className={cn(
-                            "w-10 h-10 rounded-r-xl flex items-center justify-center transition-colors border",
+                            "w-9 h-9 rounded-r-lg flex items-center justify-center transition-colors border",
+                            "active:scale-95 touch-manipulation",
                             mode === "restock"
-                              ? "bg-green-500 text-white border-green-500 hover:bg-green-600 active:bg-green-700"
-                              : "bg-blue-500 text-white border-blue-500 hover:bg-blue-600 active:bg-blue-700"
+                              ? "bg-green-500 text-white border-green-500 hover:bg-green-600"
+                              : "bg-blue-500 text-white border-blue-500 hover:bg-blue-600"
                           )}
                         >
-                          <Plus className="h-4 w-4" />
+                          <Plus className="h-3.5 w-3.5" />
                         </button>
                       </div>
+
+                      {/* Remove */}
+                      <button
+                        onClick={() => setQty(item.id, 0)}
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0 touch-manipulation"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   );
                 })}
               </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* ── Sticky bottom bar (cart) ── */}
-      <div className={cn(
-        "fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg transition-transform",
-        cartItems.length > 0 ? "translate-y-0" : "translate-y-full"
-      )}>
-        <div className="max-w-[800px] mx-auto px-4 py-3">
-          {/* Cart summary */}
-          <div className="flex items-center gap-3 mb-2">
-            <div className="flex-1">
-              <div className="text-sm font-semibold text-gray-700">
-                {mode === "restock" ? "🛒 Restock Cart" : "📋 Count Summary"}
-              </div>
-              <div className="text-xs text-gray-400">
-                {cartItems.length} item{cartItems.length !== 1 ? "s" : ""} · {totalItems} total {mode === "restock" ? "to add" : "counted"}
-              </div>
-            </div>
-            {selectedProp && (
-              <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-100 rounded-full text-xs font-medium">
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: selectedProp.color }} />
-                {selectedProp.name}
-              </div>
             )}
           </div>
 
-          {/* Scrollable item chips */}
-          <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-thin mb-2">
-            {cartItems.map((item) => (
-              <div key={item.id} className={cn(
-                "flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium shrink-0",
-                mode === "restock" ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"
-              )}>
-                {item.name}
-                <span className="font-bold">×{item.qty}</span>
+          {/* Submit bar */}
+          <div className="shrink-0 border-t bg-white px-4 py-3">
+            {/* Summary */}
+            <div className="flex items-center justify-between mb-2.5">
+              <div className="flex items-center gap-2">
+                {selectedProp && (
+                  <div className="flex items-center gap-1.5 px-2 py-0.5 bg-gray-100 rounded-full text-xs font-medium">
+                    <div
+                      className="w-2 h-2 rounded-full"
+                      style={{ backgroundColor: selectedProp.color }}
+                    />
+                    {selectedProp.name}
+                  </div>
+                )}
+                <span className="text-xs text-gray-400">
+                  {cartItems.length} item{cartItems.length !== 1 ? "s" : ""}
+                </span>
               </div>
-            ))}
-          </div>
+              {mode === "count" && (
+                <span
+                  className={cn(
+                    "text-xs font-semibold",
+                    allCounted ? "text-green-600" : "text-gray-400"
+                  )}
+                >
+                  {allCounted ? "All items counted ✓" : `${progress.total - progress.counted} remaining`}
+                </span>
+              )}
+            </div>
 
-          {/* Submit button */}
-          <Button
-            onClick={handleSubmit}
-            className={cn(
-              "w-full h-12 text-base font-semibold rounded-xl",
-              mode === "restock"
-                ? "bg-green-600 hover:bg-green-700"
-                : "bg-blue-600 hover:bg-blue-700"
+            {/* Submit button */}
+            <Button
+              onClick={handleSubmit}
+              disabled={
+                cartItems.length === 0 ||
+                submitting ||
+                (mode === "count" && !allCounted)
+              }
+              className={cn(
+                "w-full h-12 text-base font-semibold rounded-xl transition-all active:scale-[0.98] touch-manipulation",
+                mode === "restock"
+                  ? "bg-green-600 hover:bg-green-700 disabled:bg-gray-200"
+                  : "bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200"
+              )}
+            >
+              {submitting ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : mode === "restock" ? (
+                <>
+                  <ShoppingCart className="h-5 w-5 mr-2" />
+                  Confirm Restock ({cartItems.length} items)
+                </>
+              ) : (
+                <>
+                  <ClipboardCheck className="h-5 w-5 mr-2" />
+                  Save Stock Count
+                </>
+              )}
+            </Button>
+
+            {mode === "count" && !allCounted && cartItems.length > 0 && (
+              <p className="text-[10px] text-center text-amber-600 mt-1.5">
+                Count all items before submitting
+              </p>
             )}
-          >
-            {mode === "restock" ? (
-              <>
-                <ShoppingCart className="h-5 w-5 mr-2" />
-                Confirm Restock ({totalItems} items)
-              </>
-            ) : (
-              <>
-                <ClipboardCheck className="h-5 w-5 mr-2" />
-                Save Stock Count ({cartItems.length} items)
-              </>
-            )}
-          </Button>
+          </div>
         </div>
       </div>
     </div>

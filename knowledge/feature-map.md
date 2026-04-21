@@ -46,7 +46,7 @@ Last updated: 2026-04-20
 | Stock logs | `GET /api/inventory/stock` | Audit trail, tenant-filtered |
 | Low stock detection | Computed in GET items | totalStock <= minStock |
 | Auto-deduct | Via stock POST with type CHECKOUT_USE | Linked to bookingId |
-| Stock counter page | `/inventory/counter` | POS-style restock/count interface |
+| Stock counter page | `/inventory/counter` | POS-style split-screen: left grid (tap-to-count), right list with +/-, progress bar, variance display |
 | Items setup page | `/inventory/items` | CRUD with image upload |
 | Image upload | `POST /api/upload` | Multipart form, saves to /public/uploads |
 

@@ -86,21 +86,11 @@ echo ""
 echo "=== Status ==="
 pm2 list | grep ${APP_NAME}
 
-echo ""
-echo "=== IMPORTANT: Manual step needed ==="
-echo "Add proxy host in Nginx Proxy Manager (https://nginx.lightepic.com):"
-echo "  Domain: air-admin.lightepic.com"
-echo "  Scheme: http"
-echo "  Forward Host: 172.17.0.1"
-echo "  Forward Port: ${ADMIN_PORT}"
-echo "  SSL: Custom Certificate (lightepic.com wildcard)"
-echo "  Force SSL: Yes | HTTP/2: Yes | Websockets: Yes"
 DEPLOY
 
 if [ $? -eq 0 ]; then
     echo ""
-    echo -e "${GREEN}✓ Admin app deployed on port ${ADMIN_PORT}${NC}"
-    echo -e "${BLUE}Next: Add air-admin.lightepic.com in Nginx Proxy Manager → 172.17.0.1:${ADMIN_PORT}${NC}"
+    echo -e "${GREEN}✓ Admin app deployed to https://air-admin.lightepic.com${NC}"
 else
     echo ""
     echo -e "${RED}✗ Deploy failed${NC}"
