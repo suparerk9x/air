@@ -45,6 +45,9 @@ npx prisma generate --schema=prisma/schema.prisma
 echo "=== Running migrations ==="
 npx prisma migrate deploy --schema=prisma/schema.prisma
 
+echo "=== Ensuring apps/web/.env ==="
+cp -n .env apps/web/.env 2>/dev/null || true
+
 echo "=== Building web app ==="
 npm run build --workspace=apps/web
 
