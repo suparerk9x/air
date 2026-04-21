@@ -17,7 +17,7 @@
 /tests/e2e/screenshots/
 
 # next.js
-/.next/
+.next/
 /out/
 
 # production
@@ -44,7 +44,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-/src/generated/prisma
+**/src/generated/prisma
 .playwright-mcp/
 
 # oracle deployment
