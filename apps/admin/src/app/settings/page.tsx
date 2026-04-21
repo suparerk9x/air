@@ -68,10 +68,16 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set(["inventory"]));
 
-  // DnD state
+  // DnD state (parent)
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const dragCounter = useRef(0);
+
+  // DnD state (children)
+  const [childDragParent, setChildDragParent] = useState<string | null>(null);
+  const [childDragIndex, setChildDragIndex] = useState<number | null>(null);
+  const [childDragOverIndex, setChildDragOverIndex] = useState<number | null>(null);
+  const childDragCounter = useRef(0);
 
   useEffect(() => {
     fetch("/api/settings")
@@ -181,6 +187,60 @@ export default function SettingsPage() {
     dragCounter.current = 0;
   }
 
+  // ─── Child drag handlers ──────────────────────────────────────────
+  function handleChildDragStart(parentKey: string, index: number, e: React.DragEvent) {
+    e.stopPropagation();
+    setChildDragParent(parentKey);
+    setChildDragIndex(index);
+  }
+
+  function handleChildDragEnter(index: number, e: React.DragEvent) {
+    e.stopPropagation();
+    childDragCounter.current++;
+    setChildDragOverIndex(index);
+  }
+
+  function handleChildDragLeave(e: React.DragEvent) {
+    e.stopPropagation();
+    childDragCounter.current--;
+    if (childDragCounter.current === 0) {
+      setChildDragOverIndex(null);
+    }
+  }
+
+  function handleChildDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function handleChildDrop(parentKey: string, index: number, e: React.DragEvent) {
+    e.stopPropagation();
+    if (!config || childDragParent !== parentKey || childDragIndex === null || childDragIndex === index) {
+      resetChildDrag();
+      return;
+    }
+    const updated = config.map((item) => {
+      if (item.key !== parentKey || !item.children) return item;
+      const children = [...item.children];
+      const [moved] = children.splice(childDragIndex!, 1);
+      children.splice(index, 0, moved);
+      return { ...item, children };
+    });
+    saveConfig(updated);
+    resetChildDrag();
+  }
+
+  function handleChildDragEnd() {
+    resetChildDrag();
+  }
+
+  function resetChildDrag() {
+    setChildDragParent(null);
+    setChildDragIndex(null);
+    setChildDragOverIndex(null);
+    childDragCounter.current = 0;
+  }
+
   if (loading) {
     return (
       <AdminSidebar>
@@ -201,7 +261,7 @@ export default function SettingsPage() {
           เปิด/ปิด menu ที่แสดงใน web app สำหรับผู้ใช้ทั่วไป
         </p>
         <p className="text-xs text-gray-400 mb-6">
-          ลาก (drag) เพื่อจัดลำดับ menu
+          ลาก (drag) เพื่อจัดลำดับ menu และ submenu
         </p>
 
         <Card className="overflow-hidden">
@@ -284,17 +344,36 @@ export default function SettingsPage() {
                 {/* Children */}
                 {hasChildren && isExpanded && item.children && (
                   <div className="bg-gray-50/50">
-                    {item.children.map((child) => {
+                    {item.children.map((child, childIdx) => {
                       const childDef = def.children!.find(
                         (d) => d.key === child.key
                       );
                       if (!childDef) return null;
 
+                      const isChildDragging = childDragParent === item.key && childDragIndex === childIdx;
+                      const isChildDragOver = childDragParent === item.key && childDragOverIndex === childIdx && childDragIndex !== childIdx;
+
                       return (
                         <div
                           key={child.key}
-                          className="flex items-center gap-3 pl-16 pr-4 py-2.5 border-b last:border-b-0"
+                          draggable
+                          onDragStart={(e) => handleChildDragStart(item.key, childIdx, e)}
+                          onDragEnter={(e) => handleChildDragEnter(childIdx, e)}
+                          onDragLeave={handleChildDragLeave}
+                          onDragOver={handleChildDragOver}
+                          onDrop={(e) => handleChildDrop(item.key, childIdx, e)}
+                          onDragEnd={handleChildDragEnd}
+                          className={cn(
+                            "flex items-center gap-3 pl-12 pr-4 py-2.5 border-b last:border-b-0 transition-all",
+                            isChildDragging && "opacity-40",
+                            isChildDragOver && "bg-indigo-50 border-indigo-200"
+                          )}
                         >
+                          {/* Child drag handle */}
+                          <div className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 touch-manipulation">
+                            <GripVertical className="h-3.5 w-3.5" />
+                          </div>
+
                           <childDef.icon className="h-3.5 w-3.5 text-gray-400 shrink-0" />
                           <span
                             className={cn(
