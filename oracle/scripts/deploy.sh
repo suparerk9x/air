@@ -49,7 +49,13 @@ echo "=== Building web app ==="
 npm run build --workspace=apps/web
 
 echo "=== Reloading PM2 ==="
-pm2 reload ${APP_NAME}
+if pm2 describe ${APP_NAME} > /dev/null 2>&1; then
+    pm2 reload ${APP_NAME}
+else
+    cd apps/web
+    pm2 start npm --name "${APP_NAME}" -- start
+    cd ${APP_PATH}
+fi
 pm2 save
 
 echo ""
