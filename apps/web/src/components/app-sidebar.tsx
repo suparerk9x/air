@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -13,13 +13,19 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const NAV_ITEMS = [
-  { href: "/", label: "Dashboard", icon: Home },
-  { href: "/inventory", label: "Inventory", icon: Package },
+interface MenuConfig {
+  dashboard: boolean;
+  inventory: boolean;
+  calendarSync: boolean;
+}
+
+const ALL_NAV_ITEMS = [
+  { href: "/", label: "Dashboard", icon: Home, key: "dashboard" as const },
+  { href: "/inventory", label: "Inventory", icon: Package, key: "inventory" as const },
 ];
 
-const SETTINGS_ITEMS = [
-  { href: "/calendar-sync", label: "Calendar Sync", icon: Rss },
+const ALL_SETTINGS_ITEMS = [
+  { href: "/calendar-sync", label: "Calendar Sync", icon: Rss, key: "calendarSync" as const },
 ];
 
 export function AppSidebar({
@@ -30,7 +36,22 @@ export function AppSidebar({
   headerRight?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(true);
+  const [menuConfig, setMenuConfig] = useState<MenuConfig>({
+    dashboard: true,
+    inventory: true,
+    calendarSync: true,
+  });
   const pathname = usePathname();
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data) setMenuConfig(data); })
+      .catch(() => {});
+  }, []);
+
+  const NAV_ITEMS = ALL_NAV_ITEMS.filter((item) => menuConfig[item.key]);
+  const SETTINGS_ITEMS = ALL_SETTINGS_ITEMS.filter((item) => menuConfig[item.key]);
 
   const pageTitle =
     pathname === "/" ? "Dashboard" :
@@ -100,11 +121,14 @@ export function AppSidebar({
               );
             })}
 
-            <div className="h-px bg-gray-100 my-2" />
-
-            <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
-              Settings
-            </div>
+            {SETTINGS_ITEMS.length > 0 && (
+              <>
+                <div className="h-px bg-gray-100 my-2" />
+                <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                  Settings
+                </div>
+              </>
+            )}
             {SETTINGS_ITEMS.map((item) => {
               const active = pathname === item.href;
               return (

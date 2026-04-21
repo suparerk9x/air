@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Users,
   Activity,
+  Settings,
   PanelLeftClose,
   PanelLeft,
   Shield,
@@ -19,6 +20,7 @@ const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/users", label: "Users", icon: Users },
   { href: "/monitor", label: "Monitor", icon: Activity },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function AdminSidebar({ children }: { children: React.ReactNode }) {
@@ -37,6 +39,7 @@ export function AdminSidebar({ children }: { children: React.ReactNode }) {
     pathname === "/" ? "Dashboard" :
     pathname === "/users" ? "Users" :
     pathname === "/monitor" ? "Monitor" :
+    pathname === "/settings" ? "Settings" :
     "";
 
   return (
