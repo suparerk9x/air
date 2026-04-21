@@ -39,14 +39,14 @@ git pull
 echo "=== Installing dependencies ==="
 npm install
 
-echo "=== Generating Prisma client ==="
-npx prisma generate
+echo "=== Generating Prisma clients ==="
+npx prisma generate --schema=prisma/schema.prisma
 
 echo "=== Running migrations ==="
-npx prisma migrate deploy
+npx prisma migrate deploy --schema=prisma/schema.prisma
 
-echo "=== Building ==="
-npm run build
+echo "=== Building web app ==="
+npm run build --workspace=apps/web
 
 echo "=== Reloading PM2 ==="
 pm2 reload ${APP_NAME}
